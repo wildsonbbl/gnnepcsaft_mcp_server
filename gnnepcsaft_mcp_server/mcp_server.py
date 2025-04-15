@@ -31,6 +31,3 @@ fn_list: List[Callable[..., Any]] = [
 ]
 for fn in fn_list:
     mcp.add_tool(fn)
-
-if __name__ == "__main__":
-    mcp.run("stdio")

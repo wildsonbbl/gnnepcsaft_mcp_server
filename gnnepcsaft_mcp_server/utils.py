@@ -1,6 +1,5 @@
 "utils for agents"
 
-import os.path as osp
 from json import loads
 from pathlib import Path
 from typing import List, Literal
@@ -12,8 +11,8 @@ import onnxruntime as ort
 from gnnepcsaft.data.ogb_utils import smiles2graph
 from gnnepcsaft.data.rdkit_util import assoc_number, smilestoinchi
 
-file_dir = Path(osp.dirname(__file__))
-model_dir = file_dir / ".." / "hfdata"
+file_dir = Path(__file__)
+model_dir = file_dir / "models"
 ort.set_default_logger_severity(3)
 
 msigmae_onnx = ort.InferenceSession(model_dir / "msigmae_7.onnx")
