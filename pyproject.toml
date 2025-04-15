@@ -21,6 +21,10 @@ dependencies = [
 [project.scripts]
 gnnepcsaftmcp = 'gnnepcsaft_mcp_server.mcp_server:run'
 
+[tool.poetry]
+include = ["models/**onnx**"]
+
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
