@@ -13,6 +13,8 @@ This is the Model Context Protocol (MCP) server implementation for [GNNePCSAFT](
 
 ## Installation
 
+You're gonna need [pipx](https://pipx.pypa.io/latest/installation/) for this.
+
 ```bash
 pipx install gnnepcsaft_mcp_server
 ```
@@ -25,7 +27,7 @@ stdio command to start the MCP server:
 {
   "mcpServers": {
     "gnnepcsaft": {
-      "command": "gnnepcsaft_mcp_server",
+      "command": "gnnepcsaftmcp",
       "args": []
     }
   }
