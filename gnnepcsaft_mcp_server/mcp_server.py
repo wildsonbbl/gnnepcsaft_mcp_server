@@ -1,4 +1,4 @@
-"mcp server"
+"GNNePCSAFT MCP Server"
 
 from typing import Any, Callable, List
 

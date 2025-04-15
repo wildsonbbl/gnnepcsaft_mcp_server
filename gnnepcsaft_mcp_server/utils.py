@@ -1,4 +1,4 @@
-"utils for agents"
+"Utils for MCP Server"
 
 from json import loads
 from pathlib import Path
