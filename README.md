@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the Model Context Protocol (MCP) server implementation for [GNNePCSAFT](https://github.com/wildsonbbl/gnnepcsaft) tools. The server handles communication and context management between models and clients using the MCP protocol.
+This is the Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction)) server implementation for [GNNePCSAFT](https://github.com/wildsonbbl/gnnepcsaft) tools. The server handles communication and context management between models and clients using the MCP protocol.
 
 ## Features
 
@@ -16,7 +16,7 @@ This is the Model Context Protocol (MCP) server implementation for [GNNePCSAFT](
 You're gonna need [pipx](https://pipx.pypa.io/latest/installation/) for this.
 
 ```bash
-pipx install gnnepcsaft_mcp_server
+pipx install gnnepcsaft-mcp-server
 ```
 
 ## Usage
