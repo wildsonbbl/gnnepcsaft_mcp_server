@@ -22,7 +22,7 @@ dependencies = [
 gnnepcsaftmcp = 'gnnepcsaft_mcp_server.mcp_server:run'
 
 [tool.poetry]
-include = ["models/**onnx**"]
+include = ["gnnepcsaft_mcp_server/models/assoc_8.onnx", "gnnepcsaft_mcp_server/models/assoc_8.onnx.data", "gnnepcsaft_mcp_server/models/msigmae_7.onnx", "gnnepcsaft_mcp_server/models/msigmae_7.onnx.data"]
 
 
 
