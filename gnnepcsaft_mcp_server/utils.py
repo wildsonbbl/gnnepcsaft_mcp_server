@@ -11,7 +11,7 @@ import onnxruntime as ort
 from gnnepcsaft.data.ogb_utils import smiles2graph
 from gnnepcsaft.data.rdkit_util import assoc_number, smilestoinchi
 
-file_dir = Path(__file__)
+file_dir = Path(__file__).parent
 model_dir = file_dir / "models"
 ort.set_default_logger_severity(3)
 
