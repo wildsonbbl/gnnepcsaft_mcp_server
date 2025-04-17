@@ -13,22 +13,18 @@ This is the Model Context Protocol ([MCP](https://modelcontextprotocol.io/introd
 
 ## Installation
 
-You're gonna need [pipx](https://pipx.pypa.io/latest/installation/) for this.
-
-```bash
-pipx install gnnepcsaft-mcp-server
-```
+You're gonna need [uvx](https://docs.astral.sh/uv/).
 
 ## Usage
 
-stdio command to start the MCP server:
+stdio config to start the MCP server:
 
 ```json
 {
   "mcpServers": {
     "gnnepcsaft": {
-      "command": "gnnepcsaftmcp",
-      "args": []
+      "command": "uvx",
+      "args": ["--from", "gnnepcsaft-mcp-server", "gnnepcsaftmcp"]
     }
   }
 }
