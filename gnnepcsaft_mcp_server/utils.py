@@ -2,14 +2,15 @@
 
 from json import loads
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Tuple
 from urllib.parse import quote
 from urllib.request import HTTPError, urlopen
 
 import numpy as np
 import onnxruntime as ort
 from gnnepcsaft.data.ogb_utils import smiles2graph
-from gnnepcsaft.data.rdkit_util import assoc_number, smilestoinchi
+from gnnepcsaft.data.rdkit_util import assoc_number, inchitosmiles, smilestoinchi
+from gnnepcsaft.epcsaft.epcsaft_feos import mix_den_feos, mix_vp_feos
 
 file_dir = Path(__file__).parent
 model_dir = file_dir / "models"
@@ -134,3 +135,59 @@ def pubchem_description(inchi: str) -> str:
     except (TypeError, HTTPError, ValueError):
         ans = "no data available on this molecule in PubChem."
     return ans
+
+
+def mixture_density(
+    parameters: List[List[float]],
+    state: List[float],
+    kij_matrix: List[List[float]],
+) -> float:
+    """Calculates mixture liquid density (mol/m³) with ePC-SAFT.
+
+    Args:
+        parameters: A list of
+         `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
+         for each component of the mixture
+        state: A list with
+         `[Temperature (K), Pressure (Pa), mole_fractions_1, mole_fractions_2, ...]`
+        kij_matrix: A matrix of binary interaction parameters
+    """
+
+    return mix_den_feos(parameters, state, kij_matrix)
+
+
+def mixture_vapor_pressure(
+    parameters: List[List[float]],
+    state: List[float],
+    kij_matrix: List[List[float]],
+) -> Tuple[float, float]:
+    """Calculates mixture `(Bubble point (Pa), Dew point (Pa))` with ePC-SAFT.
+
+    Args:
+        parameters: A list of
+         `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
+         for each component of the mixture
+        state: A list with
+         `[Temperature (K), Pressure (Pa), mole_fractions_1, molefractions_2, ...]`
+        kij_matrix: A matrix of binary interaction parameters
+    """
+
+    return mix_vp_feos(parameters, state, kij_matrix)
+
+
+def smiles_to_inchi(smiles: str) -> str:
+    """Transform SMILES to InChI.
+
+    Args:
+        smiles (str): SMILES
+    """
+    return smilestoinchi(smiles)
+
+
+def inchi_to_smiles(inchi: str) -> str:
+    """Transform InChI to SMILES.
+
+    Args:
+        inchi (str): InChI
+    """
+    return inchitosmiles(inchi)
