@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gnnepcsaft_mcp_server.utils import (
+from gnnepcsaft_mcp_server.utils import (  # pylint: disable=E0401,E0611
     batch_convert_pure_density_to_kg_per_m3,
     batch_critical_points,
     batch_inchi_to_smiles,
