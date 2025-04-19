@@ -25,8 +25,9 @@ jobs:
           cp hfdata/*.onnx* ./gnnepcsaft_mcp_server/models
       - name: Unit tests
         run: |
+          uv pip install pytest
           uv pip install -r pyproject.toml
-          pytests tests
+          pytest tests
       - name: Publish to PyPI
         run: |
           uv build
