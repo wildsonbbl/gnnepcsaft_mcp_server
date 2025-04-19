@@ -26,6 +26,9 @@ include = ["gnnepcsaft_mcp_server/models/assoc_8.onnx", "gnnepcsaft_mcp_server/m
 
 
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

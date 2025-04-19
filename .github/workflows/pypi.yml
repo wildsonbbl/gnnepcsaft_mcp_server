@@ -23,6 +23,10 @@ jobs:
         run: |
           git clone https://huggingface.co/wildsonbbl/gnnepcsaft  hfdata
           cp hfdata/*.onnx* ./gnnepcsaft_mcp_server/models
+      - name: Unit tests
+        run: |
+          uv pip install -r pyproject.toml
+          pytests tests
       - name: Publish to PyPI
         run: |
           uv build
