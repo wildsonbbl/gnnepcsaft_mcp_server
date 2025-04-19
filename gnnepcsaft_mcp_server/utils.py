@@ -9,8 +9,15 @@ from urllib.request import HTTPError, urlopen
 import numpy as np
 import onnxruntime as ort
 from gnnepcsaft.data.ogb_utils import smiles2graph
-from gnnepcsaft.data.rdkit_util import assoc_number, inchitosmiles, smilestoinchi
-from gnnepcsaft.epcsaft.epcsaft_feos import mix_den_feos, mix_vp_feos
+from gnnepcsaft.data.rdkit_util import assoc_number, inchitosmiles, mw, smilestoinchi
+from gnnepcsaft.epcsaft.epcsaft_feos import (
+    critical_points_feos,
+    mix_den_feos,
+    mix_vp_feos,
+    pure_den_feos,
+    pure_h_lv_feos,
+    pure_vp_feos,
+)
 
 file_dir = Path(__file__).parent
 model_dir = file_dir / "models"
@@ -20,11 +27,12 @@ msigmae_onnx = ort.InferenceSession(model_dir / "msigmae_7.onnx")
 assoc_onnx = ort.InferenceSession(model_dir / "assoc_8.onnx")
 
 
-def prediction(
+def predict_epcsaft_parameters(
     smiles: str,
 ) -> List[float]:
     """Predict ePC-SAFT parameters
-    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]`
+    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]` with
+    the GNNePCSAFT model.
 
     Args:
       smiles (str): SMILES of the molecule.
@@ -118,18 +126,20 @@ def mixture_phase(
     )
 
 
-def pubchem_description(inchi: str) -> str:
+def pubchem_description(smiles: str) -> str:
     """
-    Look for information on PubChem for the InChI.
+    Look for information on PubChem for the SMILES.
 
     Args:
-        inchi (str): The InChI of the molecule.
+        smiles (str): The SMILES of the molecule.
     """
-    url = (
-        "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchi/description/json?inchi="
-        + quote(inchi, safe="")
-    )
+
     try:
+        inchi = smilestoinchi(smiles)
+        url = (
+            "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchi/description/json?inchi="
+            + quote(inchi, safe="")
+        )
         with urlopen(url) as ans:
             ans = loads(ans.read().decode("utf8").strip())
     except (TypeError, HTTPError, ValueError):
@@ -148,7 +158,7 @@ def mixture_density(
         parameters: A list of
          `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
          for each component of the mixture
-        state: A list with
+        state: A list with the state of the mixture
          `[Temperature (K), Pressure (Pa), mole_fractions_1, mole_fractions_2, ...]`
         kij_matrix: A matrix of binary interaction parameters
     """
@@ -167,27 +177,152 @@ def mixture_vapor_pressure(
         parameters: A list of
          `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
          for each component of the mixture
-        state: A list with
-         `[Temperature (K), Pressure (Pa), mole_fractions_1, molefractions_2, ...]`
-        kij_matrix: A matrix of binary interaction parameters
+        state: A list with the state of the mixture
+         `[Temperature (K), Pressure (Pa), mole_fractions_1, molefractions_2, ...]`.
+         The pressure should be any `float` value since it's not used in the calculation.
+        kij_matrix: A matrix of binary interaction parameters.
     """
 
     return mix_vp_feos(parameters, state, kij_matrix)
 
 
-def smiles_to_inchi(smiles: str) -> str:
-    """Transform SMILES to InChI.
+def batch_predict_epcsaft_parameters(
+    smiles: List[str],
+) -> List[List[float]]:
+    """Predict ePC-SAFT parameters
+    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]`
+    for a list of SMILES with the GNNePCSAFT model.
 
     Args:
-        smiles (str): SMILES
+      smiles (List[str]): SMILES of the molecules.
     """
-    return smilestoinchi(smiles)
+    return [predict_epcsaft_parameters(smi) for smi in smiles]
 
 
-def inchi_to_smiles(inchi: str) -> str:
-    """Transform InChI to SMILES.
+def batch_molecular_weights(
+    smiles: List[str],
+) -> List[float]:
+    """Calcultes molecular weight in `g/mol` for a list of SMILES
 
     Args:
-        inchi (str): InChI
+      smiles (List[str]): SMILES of the molecules.
     """
-    return inchitosmiles(inchi)
+    inchi_list = [smilestoinchi(smi) for smi in smiles]
+    return [mw(inchi) for inchi in inchi_list]
+
+
+def batch_inchi_to_smiles(
+    inchi_list: List[str],
+) -> List[str]:
+    """Transform a list of InChI to SMILES.
+
+    Args:
+        inchi_list (List[str]): List of InChI
+    """
+    return [inchitosmiles(inchi) for inchi in inchi_list]
+
+
+def batch_smiles_to_inchi(
+    smiles_list: List[str],
+) -> List[str]:
+    """Transform a list of SMILES to InChI.
+
+    Args:
+        smiles_list (List[str]): List of SMILES
+    """
+    return [smilestoinchi(smi) for smi in smiles_list]
+
+
+def batch_pure_density(
+    smiles_list: List[str],
+    state: List[float],
+) -> List[float]:
+    """Calculates pure liquid density in `kg/m³` with ePC-SAFT for a list of SMILES.
+    The state is the same for all molecules. The GNNePCSAFT model is used to predict
+    ePCSAFT parameters.
+
+    Args:
+        smiles_list (List[str]): List of SMILES
+        state: A list with
+         `[Temperature (K), Pressure (Pa)]`
+    """
+    return [
+        pure_den_feos(predict_epcsaft_parameters(smi), state) for smi in smiles_list
+    ]
+
+
+def batch_pure_vapor_pressure(
+    smiles_list: List[str],
+    temperature: float,
+) -> List[float]:
+    """Calculates pure vapor pressure in `Pa` with ePC-SAFT for a list of SMILES.
+    The temperature is the same for all molecules. The GNNePCSAFT model is used to predict
+    ePCSAFT parameters.
+
+    Args:
+        smiles_list (List[str]): List of SMILES
+        temperature: `Temperature (K)`
+    """
+    return [
+        pure_vp_feos(predict_epcsaft_parameters(smi), [temperature])
+        for smi in smiles_list
+    ]
+
+
+def batch_pure_h_lv(
+    smiles_list: List[str],
+    temperature: float,
+) -> List[float]:
+    """Calculates pure liquid enthalpy of vaporization in `kJ/mol`
+    with ePC-SAFT for a list of SMILES.
+    The temperature is the same for all molecules.
+    The GNNePCSAFT model is used to predict
+    ePCSAFT parameters.
+
+    Args:
+        smiles_list (List[str]): List of SMILES
+        temperature: `Temperature (K)`
+    """
+    return [
+        pure_h_lv_feos(predict_epcsaft_parameters(smi), [temperature])
+        for smi in smiles_list
+    ]
+
+
+def batch_critical_points(
+    smiles_list: List[str],
+) -> List[List[float]]:
+    """
+    Calculates critical points `[Temperature (K), Pressure (Pa), Density (mol/m³)]` with ePC-SAFT
+    for a list of SMILES. The GNNePCSAFT model is used to predict ePCSAFT parameters.
+
+    Args:
+        smiles_list (List[str]): List of SMILES
+    """
+    return [
+        critical_points_feos(predict_epcsaft_parameters(smi)) for smi in smiles_list
+    ]
+
+
+def batch_pa_to_bar(
+    pressure_in_pa_list: List[float],
+) -> List[float]:
+    """Convert a list of pressure from `Pa` to `bar`.
+
+    Args:
+        pressure_in_pa_list (List[float]): List of pressure in `Pa`
+    """
+    return [pa / 100_000.0 for pa in pressure_in_pa_list]
+
+
+def batch_convert_pure_density_to_kg_per_m3(
+    density_list: List[float],
+    molecular_weight_list: List[float],
+) -> List[float]:
+    """Convert a list of density from `mol/m³` to `kg/m³`
+
+    Args:
+        density_list (List[float]): List of density in `mol/m³`
+        molecular_weight_list (List[float]): List of molecular weight in `g/mol`
+    """
+    return [den * molw / 1000 for den, molw in zip(density_list, molecular_weight_list)]
