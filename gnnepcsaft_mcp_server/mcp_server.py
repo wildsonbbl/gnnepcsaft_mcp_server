@@ -4,6 +4,7 @@ from typing import Any, Callable, List
 
 from mcp.server.fastmcp import FastMCP
 
+from .plot_utils import v3000_mol_block
 from .utils import (
     batch_convert_pure_density_to_kg_per_m3,
     batch_critical_points,
@@ -39,6 +40,7 @@ fn_list: List[Callable[..., Any]] = [
     mixture_vapor_pressure,
     pubchem_description,
     pure_phase,
+    v3000_mol_block,
 ]
 for fn in fn_list:
     mcp.add_tool(fn)
