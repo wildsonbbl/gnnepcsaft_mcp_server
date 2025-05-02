@@ -1,30 +1,34 @@
 # GNNEPCSAFT MCP Server
 
-## Overview
+## What is GNNEPCSAFT MCP Server?
 
-This is the Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction)) server implementation for [GNNePCSAFT](https://github.com/wildsonbbl/gnnepcsaft) tools. The server handles communication and context management between LLM models and clients using the MCP protocol. GNNePCSAFT is a Graph Neural Network ([GNN](https://en.wikipedia.org/wiki/Graph_neural_network)) that can estimate [ePC-SAFT](https://en.wikipedia.org/wiki/PC-SAFT) parameters. This allows thermodynamic calculations like density and vapor pressure without experimental data for any molecule. [FeOS](https://github.com/feos-org/feos) is used for the PC-SAFT calculations.
+GNNEPCSAFT MCP Server is an implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) for [GNNePCSAFT](https://github.com/wildsonbbl/gnnepcsaft) tools. It enables seamless communication and context management between large language models (LLMs) and clients for advanced thermodynamic calculations. GNNePCSAFT leverages Graph Neural Networks (GNNs) to estimate [ePC-SAFT](https://en.wikipedia.org/wiki/PC-SAFT) parameters, allowing property predictions such as density and vapor pressure for any molecule, even without experimental data. [FeOS](https://github.com/feos-org/feos) is used for PC-SAFT calculations.
 
-## Features
+---
 
-- Calculates density, vapor pressure, enthalpy of vaporization and critical points
-- Estimates ePC-SAFT parameters
-- Thermodynamic calculations for pure components and mixtures
-- Collects information from PubChem, if any, for any molecule
-- Allows thermodynamics-aware LLMs
+## Key Features
 
-## Installation
+- **Estimate ePC-SAFT parameters** using GNNs
+- **Calculate density, vapor pressure, enthalpy of vaporization, critical points, and others**
+- **Support for pure components and mixtures**
+- **Automatic data collection from PubChem** for any molecule
+- **Designed for thermodynamics-aware LLMs**
 
-You're gonna need [uvx](https://docs.astral.sh/uv/).
+---
 
-## Usage
+## How to Use
 
-The command to start the server would be:
+### Installation
+
+You need [uvx](https://docs.astral.sh/uv/) installed.
+
+### Starting the Server
 
 ```bash
 uvx --from gnnepcsaft-mcp-server gnnepcsaftmcp
 ```
 
-[Claude Desktop](https://claude.ai/download) config to start the MCP server:
+### Example: Claude Desktop Configuration
 
 ```json
 {
@@ -36,6 +40,36 @@ uvx --from gnnepcsaft-mcp-server gnnepcsaftmcp
   }
 }
 ```
+
+---
+
+## Use Cases
+
+- Predicting thermodynamic properties for new or existing molecules
+- Running property calculations for mixtures in research or industry
+- Integrating with LLMs for chemistry and materials science applications
+- Automating data collection and property estimation in pipelines
+
+---
+
+## FAQ
+
+**Q: What do I need to run the server?**  
+A: You need Python, [uvx](https://docs.astral.sh/uv/), and the GNNEPCSAFT MCP Server package.
+
+**Q: Can I use this for mixtures as well as pure components?**  
+A: Yes, the server supports both pure components and mixtures.
+
+**Q: Where does the molecular data come from?**  
+A: The server can automatically fetch molecular information from PubChem.
+
+**Q: What calculations are supported?**  
+A: Density, vapor pressure, enthalpy of vaporization, critical points, and ePC-SAFT parameter estimation.
+
+**Q: Is this open source?**  
+A: Yes, it is licensed under the GNU General Public License v3.0.
+
+---
 
 ## License
 
