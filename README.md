@@ -2,13 +2,13 @@
 
 ## What is GNNEPCSAFT MCP Server?
 
-GNNEPCSAFT MCP Server is an implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) for [GNNePCSAFT](https://github.com/wildsonbbl/gnnepcsaft) tools. It enables seamless communication and context management between large language models (LLMs) and clients for advanced thermodynamic calculations. GNNePCSAFT leverages Graph Neural Networks (GNNs) to estimate [ePC-SAFT](https://en.wikipedia.org/wiki/PC-SAFT) parameters, allowing property predictions such as density and vapor pressure for any molecule, even without experimental data. [FeOS](https://github.com/feos-org/feos) is used for PC-SAFT calculations.
+GNNEPCSAFT MCP Server is an implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) for [GNNePCSAFT](https://github.com/wildsonbbl/gnnepcsaft) tools. It enables seamless communication and context management between large language models (LLMs) and clients for advanced thermodynamic calculations. GNNePCSAFT leverages Graph Neural Networks (GNNs) to estimate [PC-SAFT](https://en.wikipedia.org/wiki/PC-SAFT) parameters, allowing property predictions such as density and vapor pressure for any molecule, even without experimental data. [FeOS](https://github.com/feos-org/feos) is used for PC-SAFT calculations.
 
 ---
 
 ## Key Features
 
-- **Estimate ePC-SAFT parameters** using GNNs
+- **Estimate PC-SAFT parameters** using GNNs
 - **Calculate density, vapor pressure, enthalpy of vaporization, critical points, and others**
 - **Support for pure components and mixtures**
 - **Automatic data collection from PubChem** for any molecule
@@ -64,7 +64,7 @@ A: Yes, the server supports both pure components and mixtures.
 A: The server can automatically fetch molecular information from PubChem.
 
 **Q: What calculations are supported?**  
-A: Density, vapor pressure, enthalpy of vaporization, critical points, and ePC-SAFT parameter estimation.
+A: Density, vapor pressure, enthalpy of vaporization, critical points, and PC-SAFT parameter estimation.
 
 **Q: Is this open source?**  
 A: Yes, it is licensed under the GNU General Public License v3.0.

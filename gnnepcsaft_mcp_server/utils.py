@@ -30,7 +30,7 @@ assoc_onnx = ort.InferenceSession(model_dir / "assoc_8.onnx")
 def predict_epcsaft_parameters(
     smiles: str,
 ) -> List[float]:
-    """Predict ePC-SAFT parameters
+    """Predict PC-SAFT parameters
     `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]` with
     the GNNePCSAFT model.
 
@@ -152,7 +152,7 @@ def mixture_density(
     state: List[float],
     kij_matrix: List[List[float]],
 ) -> float:
-    """Calculates mixture liquid density (mol/m³) with ePC-SAFT.
+    """Calculates mixture liquid density (mol/m³) with PC-SAFT.
 
     Args:
         parameters: A list of
@@ -171,7 +171,7 @@ def mixture_vapor_pressure(
     state: List[float],
     kij_matrix: List[List[float]],
 ) -> Tuple[float, float]:
-    """Calculates mixture `(Bubble point (Pa), Dew point (Pa))` with ePC-SAFT.
+    """Calculates mixture `(Bubble point (Pa), Dew point (Pa))` with PC-SAFT.
 
     Args:
         parameters: A list of
@@ -189,7 +189,7 @@ def mixture_vapor_pressure(
 def batch_predict_epcsaft_parameters(
     smiles: List[str],
 ) -> List[List[float]]:
-    """Predict ePC-SAFT parameters
+    """Predict PC-SAFT parameters
     `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]`
     for a list of SMILES with the GNNePCSAFT model.
 
@@ -237,9 +237,9 @@ def batch_pure_density(
     smiles_list: List[str],
     state: List[float],
 ) -> List[float]:
-    """Calculates pure liquid density in `kg/m³` with ePC-SAFT for a list of SMILES.
+    """Calculates pure liquid density in `kg/m³` with PC-SAFT for a list of SMILES.
     The state is the same for all molecules. The GNNePCSAFT model is used to predict
-    ePCSAFT parameters.
+    PCSAFT parameters.
 
     Args:
         smiles_list (List[str]): List of SMILES
@@ -255,9 +255,9 @@ def batch_pure_vapor_pressure(
     smiles_list: List[str],
     temperature: float,
 ) -> List[float]:
-    """Calculates pure vapor pressure in `Pa` with ePC-SAFT for a list of SMILES.
+    """Calculates pure vapor pressure in `Pa` with PC-SAFT for a list of SMILES.
     The temperature is the same for all molecules. The GNNePCSAFT model is used to predict
-    ePCSAFT parameters.
+    PCSAFT parameters.
 
     Args:
         smiles_list (List[str]): List of SMILES
@@ -274,10 +274,10 @@ def batch_pure_h_lv(
     temperature: float,
 ) -> List[float]:
     """Calculates pure liquid enthalpy of vaporization in `kJ/mol`
-    with ePC-SAFT for a list of SMILES.
+    with PC-SAFT for a list of SMILES.
     The temperature is the same for all molecules.
     The GNNePCSAFT model is used to predict
-    ePCSAFT parameters.
+    PCSAFT parameters.
 
     Args:
         smiles_list (List[str]): List of SMILES
@@ -293,8 +293,8 @@ def batch_critical_points(
     smiles_list: List[str],
 ) -> List[List[float]]:
     """
-    Calculates critical points `[Temperature (K), Pressure (Pa), Density (mol/m³)]` with ePC-SAFT
-    for a list of SMILES. The GNNePCSAFT model is used to predict ePCSAFT parameters.
+    Calculates critical points `[Temperature (K), Pressure (Pa), Density (mol/m³)]` with PC-SAFT
+    for a list of SMILES. The GNNePCSAFT model is used to predict PCSAFT parameters.
 
     Args:
         smiles_list (List[str]): List of SMILES
