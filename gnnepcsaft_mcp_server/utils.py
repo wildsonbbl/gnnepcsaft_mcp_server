@@ -237,7 +237,7 @@ def batch_pure_density(
     smiles_list: List[str],
     state: List[float],
 ) -> List[float]:
-    """Calculates pure liquid density in `kg/m³` with PC-SAFT for a list of SMILES.
+    """Calculates pure liquid density in `mol/m³` with PC-SAFT for a list of SMILES.
     The state is the same for all molecules. The GNNePCSAFT model is used to predict
     PCSAFT parameters.
 
