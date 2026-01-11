@@ -31,7 +31,7 @@ def predict_epcsaft_parameters(
     smiles: str,
 ) -> List[float]:
     """Predict PC-SAFT parameters
-    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]` with
+    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]` with
     the GNNePCSAFT model.
 
     Args:
@@ -71,8 +71,8 @@ def predict_epcsaft_parameters(
             "edge_attr": edge_attr,
         },
     )[0][0]
-    munanb = np.asarray([0.0, na, nb])
-    pred = np.hstack([msigmae, assoc, munanb], dtype=np.float64)
+    munanbmw = np.asarray([0.0, na, nb, mw(inchi)])
+    pred = np.hstack([msigmae, assoc, munanbmw], dtype=np.float64)
     np.clip(pred, lower_bounds, upper_bounds, out=pred)
 
     return pred.tolist()  # type: ignore
@@ -190,7 +190,7 @@ def batch_predict_epcsaft_parameters(
     smiles: List[str],
 ) -> List[List[float]]:
     """Predict PC-SAFT parameters
-    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]`
+    `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
     for a list of SMILES with the GNNePCSAFT model.
 
     Args:
