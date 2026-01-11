@@ -37,8 +37,10 @@ def predict_epcsaft_parameters(
     Args:
       smiles (str): SMILES of the molecule.
     """
-    lower_bounds = np.asarray([1.0, 1.9, 50.0, 0.0, 0.0, 0, 0, 0])
-    upper_bounds = np.asarray([25.0, 4.5, 550.0, 0.9, 5000.0, np.inf, np.inf, np.inf])
+    lower_bounds = np.asarray([1.0, 1.9, 50.0, 0.0, 0.0, 0, 0, 0, 0])
+    upper_bounds = np.asarray(
+        [25.0, 4.5, 550.0, 0.9, 5000.0, np.inf, np.inf, np.inf, np.inf]
+    )
 
     inchi = smilestoinchi(smiles)
 

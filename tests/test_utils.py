@@ -39,8 +39,8 @@ class TestPredictParameters:
         params = predict_epcsaft_parameters(METHANE_SMILES)
         assert isinstance(params, list)
         assert (
-            len(params) == 8
-        )  # [m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb]
+            len(params) == 9
+        )  # [m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, mw]
         assert all(isinstance(p, float) for p in params)
 
     def test_batch_predict_epcsaft_parameters(self):
@@ -48,7 +48,7 @@ class TestPredictParameters:
         params_list = batch_predict_epcsaft_parameters(TEST_SMILES_LIST)
         assert isinstance(params_list, list)
         assert len(params_list) == len(TEST_SMILES_LIST)
-        assert all(len(params) == 8 for params in params_list)
+        assert all(len(params) == 9 for params in params_list)
 
 
 class TestPhaseCalculations:
