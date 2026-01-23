@@ -1,46 +1,34 @@
-"GNNePCSAFT MCP Server"
+"GNNPCSAFT MCP Server"
 
 from typing import Any, Callable, List
 
 from mcp.server.fastmcp import FastMCP
 
-from .plot_utils import v3000_mol_block
 from .utils import (
-    batch_convert_pure_density_to_kg_per_m3,
     batch_critical_points,
     batch_inchi_to_smiles,
     batch_molecular_weights,
-    batch_pa_to_bar,
-    batch_predict_epcsaft_parameters,
+    batch_predict_pcsaft_parameters,
     batch_pure_density,
     batch_pure_h_lv,
     batch_pure_vapor_pressure,
     batch_smiles_to_inchi,
     mixture_density,
-    mixture_phase,
     mixture_vapor_pressure,
-    pubchem_description,
-    pure_phase,
 )
 
-mcp = FastMCP("gnnepcsaft")
+mcp = FastMCP("gnnpcsaft")
 fn_list: List[Callable[..., Any]] = [
-    batch_convert_pure_density_to_kg_per_m3,
+    batch_predict_pcsaft_parameters,
     batch_critical_points,
     batch_inchi_to_smiles,
+    batch_smiles_to_inchi,
     batch_molecular_weights,
-    batch_pa_to_bar,
-    batch_predict_epcsaft_parameters,
     batch_pure_density,
     batch_pure_h_lv,
     batch_pure_vapor_pressure,
-    batch_smiles_to_inchi,
     mixture_density,
-    mixture_phase,
     mixture_vapor_pressure,
-    pubchem_description,
-    pure_phase,
-    v3000_mol_block,
 ]
 for fn in fn_list:
     mcp.add_tool(fn)

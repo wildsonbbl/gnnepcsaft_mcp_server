@@ -11,7 +11,7 @@ from gnnepcsaft_mcp_server.utils import (  # pylint: disable=E0401,E0611
     batch_inchi_to_smiles,
     batch_molecular_weights,
     batch_pa_to_bar,
-    batch_predict_epcsaft_parameters,
+    batch_predict_pcsaft_parameters,
     batch_pure_density,
     batch_pure_h_lv,
     batch_pure_vapor_pressure,
@@ -19,7 +19,7 @@ from gnnepcsaft_mcp_server.utils import (  # pylint: disable=E0401,E0611
     mixture_density,
     mixture_phase,
     mixture_vapor_pressure,
-    predict_epcsaft_parameters,
+    predict_pcsaft_parameters,
     pubchem_description,
     pure_phase,
 )
@@ -34,18 +34,18 @@ TEST_SMILES_LIST = [METHANE_SMILES, ETHANOL_SMILES, WATER_SMILES]
 class TestPredictParameters:
     """Test parameter prediction functions"""
 
-    def test_predict_epcsaft_parameters(self):
+    def test_predict_pcsaft_parameters(self):
         """Test that parameter prediction returns expected format"""
-        params = predict_epcsaft_parameters(METHANE_SMILES)
+        params = predict_pcsaft_parameters(METHANE_SMILES)
         assert isinstance(params, list)
         assert (
             len(params) == 9
         )  # [m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, mw]
         assert all(isinstance(p, float) for p in params)
 
-    def test_batch_predict_epcsaft_parameters(self):
+    def test_batch_predict_pcsaft_parameters(self):
         """Test batch parameter prediction"""
-        params_list = batch_predict_epcsaft_parameters(TEST_SMILES_LIST)
+        params_list = batch_predict_pcsaft_parameters(TEST_SMILES_LIST)
         assert isinstance(params_list, list)
         assert len(params_list) == len(TEST_SMILES_LIST)
         assert all(len(params) == 9 for params in params_list)
@@ -193,7 +193,7 @@ class TestBatchCalculations:
     """Test batch calculations functions"""
 
     @patch("gnnepcsaft_mcp_server.utils.pure_den_feos")
-    @patch("gnnepcsaft_mcp_server.utils.predict_epcsaft_parameters")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
     def test_batch_pure_density(self, mock_predict, mock_den_feos):
         """Test batch pure density calculation"""
         mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -207,7 +207,7 @@ class TestBatchCalculations:
         assert all(d == 500.0 for d in densities)
 
     @patch("gnnepcsaft_mcp_server.utils.pure_vp_feos")
-    @patch("gnnepcsaft_mcp_server.utils.predict_epcsaft_parameters")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
     def test_batch_pure_vapor_pressure(self, mock_predict, mock_vp_feos):
         """Test batch pure vapor pressure calculation"""
         mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -221,7 +221,7 @@ class TestBatchCalculations:
         assert all(p == 50000.0 for p in pressures)
 
     @patch("gnnepcsaft_mcp_server.utils.pure_h_lv_feos")
-    @patch("gnnepcsaft_mcp_server.utils.predict_epcsaft_parameters")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
     def test_batch_pure_h_lv(self, mock_predict, mock_h_lv_feos):
         """Test batch enthalpy of vaporization calculation"""
         mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -235,7 +235,7 @@ class TestBatchCalculations:
         assert all(h == 20.0 for h in enthalpies)
 
     @patch("gnnepcsaft_mcp_server.utils.critical_points_feos")
-    @patch("gnnepcsaft_mcp_server.utils.predict_epcsaft_parameters")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
     def test_batch_critical_points(self, mock_predict, mock_critical_points):
         """Test batch critical points calculation"""
         mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]

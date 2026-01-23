@@ -10,7 +10,7 @@ import numpy as np
 import onnxruntime as ort
 from gnnepcsaft.data.ogb_utils import smiles2graph
 from gnnepcsaft.data.rdkit_util import assoc_number, inchitosmiles, mw, smilestoinchi
-from gnnepcsaft.epcsaft.epcsaft_feos import (
+from gnnepcsaft.pcsaft.pcsaft_feos import (
     critical_points_feos,
     mix_den_feos,
     mix_vp_feos,
@@ -27,12 +27,12 @@ msigmae_onnx = ort.InferenceSession(model_dir / "msigmae_7.onnx")
 assoc_onnx = ort.InferenceSession(model_dir / "assoc_8.onnx")
 
 
-def predict_epcsaft_parameters(
+def predict_pcsaft_parameters(
     smiles: str,
 ) -> List[float]:
     """Predict PC-SAFT parameters
     `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]` with
-    the GNNePCSAFT model.
+    the GNNPCSAFT model.
 
     Args:
       smiles (str): SMILES of the molecule.
@@ -188,17 +188,17 @@ def mixture_vapor_pressure(
     return mix_vp_feos(parameters, state, kij_matrix)
 
 
-def batch_predict_epcsaft_parameters(
+def batch_predict_pcsaft_parameters(
     smiles: List[str],
 ) -> List[List[float]]:
     """Predict PC-SAFT parameters
     `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
-    for a list of SMILES with the GNNePCSAFT model.
+    for a list of SMILES with the GNNPCSAFT model.
 
     Args:
       smiles (List[str]): SMILES of the molecules.
     """
-    return [predict_epcsaft_parameters(smi) for smi in smiles]
+    return [predict_pcsaft_parameters(smi) for smi in smiles]
 
 
 def batch_molecular_weights(
@@ -240,7 +240,7 @@ def batch_pure_density(
     state: List[float],
 ) -> List[float]:
     """Calculates pure liquid density in `mol/m³` with PC-SAFT for a list of SMILES.
-    The state is the same for all molecules. The GNNePCSAFT model is used to predict
+    The state is the same for all molecules. The GNNPCSAFT model is used to predict
     PCSAFT parameters.
 
     Args:
@@ -248,9 +248,7 @@ def batch_pure_density(
         state: A list with
          `[Temperature (K), Pressure (Pa)]`
     """
-    return [
-        pure_den_feos(predict_epcsaft_parameters(smi), state) for smi in smiles_list
-    ]
+    return [pure_den_feos(predict_pcsaft_parameters(smi), state) for smi in smiles_list]
 
 
 def batch_pure_vapor_pressure(
@@ -258,7 +256,7 @@ def batch_pure_vapor_pressure(
     temperature: float,
 ) -> List[float]:
     """Calculates pure vapor pressure in `Pa` with PC-SAFT for a list of SMILES.
-    The temperature is the same for all molecules. The GNNePCSAFT model is used to predict
+    The temperature is the same for all molecules. The GNNPCSAFT model is used to predict
     PCSAFT parameters.
 
     Args:
@@ -266,7 +264,7 @@ def batch_pure_vapor_pressure(
         temperature: `Temperature (K)`
     """
     return [
-        pure_vp_feos(predict_epcsaft_parameters(smi), [temperature])
+        pure_vp_feos(predict_pcsaft_parameters(smi), [temperature])
         for smi in smiles_list
     ]
 
@@ -278,7 +276,7 @@ def batch_pure_h_lv(
     """Calculates pure liquid enthalpy of vaporization in `kJ/mol`
     with PC-SAFT for a list of SMILES.
     The temperature is the same for all molecules.
-    The GNNePCSAFT model is used to predict
+    The GNNPCSAFT model is used to predict
     PCSAFT parameters.
 
     Args:
@@ -286,7 +284,7 @@ def batch_pure_h_lv(
         temperature: `Temperature (K)`
     """
     return [
-        pure_h_lv_feos(predict_epcsaft_parameters(smi), [temperature])
+        pure_h_lv_feos(predict_pcsaft_parameters(smi), [temperature])
         for smi in smiles_list
     ]
 
@@ -296,14 +294,12 @@ def batch_critical_points(
 ) -> List[List[float]]:
     """
     Calculates critical points `[Temperature (K), Pressure (Pa), Density (mol/m³)]` with PC-SAFT
-    for a list of SMILES. The GNNePCSAFT model is used to predict PCSAFT parameters.
+    for a list of SMILES. The GNNPCSAFT model is used to predict PCSAFT parameters.
 
     Args:
         smiles_list (List[str]): List of SMILES
     """
-    return [
-        critical_points_feos(predict_epcsaft_parameters(smi)) for smi in smiles_list
-    ]
+    return [critical_points_feos(predict_pcsaft_parameters(smi)) for smi in smiles_list]
 
 
 def batch_pa_to_bar(

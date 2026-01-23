@@ -1,1 +1,1 @@
-"GNNePCSAFT MCP Server"
+"GNNPCSAFT MCP Server"
