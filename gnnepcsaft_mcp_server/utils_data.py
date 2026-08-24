@@ -290,6 +290,91 @@ def _build_ternary_vle_data(
     return vle_pt_data, vle_tx_data
 
 
+def _retrieve_available_data_pure(
+    smiles: str,
+) -> Dict[str, Optional[Union[List[Tuple[float, float]], int]]]:
+    "retrieve available pure data for smiles"
+
+    rho_pure = pl.read_parquet(osp.join(application_path, "_data", "rho_pure.parquet"))
+    vp_pure = pl.read_parquet(osp.join(application_path, "_data", "vp_pure.parquet"))
+    st_pure = pl.read_parquet(osp.join(application_path, "_data", "st_pure.parquet"))
+
+    inchi = smilestoinchi(smiles)
+
+    rho_filtered = rho_pure.filter(pl.col("inchi1") == inchi)
+    if rho_filtered.height > 0:
+        rho_range = (
+            rho_filtered.select("P_kPa")
+            .group_by(pl.col("P_kPa"))
+            .agg(pl.len().alias("count"))
+            .filter(pl.col("count") > 1)
+            .sort(pl.col("P_kPa"))
+            .to_numpy()
+            .tolist()
+        )
+    else:
+        rho_range = None
+
+    vp_filtered = vp_pure.filter(pl.col("inchi1") == inchi)
+    if vp_filtered.height > 0:
+        vp_range = vp_filtered.height
+    else:
+        vp_range = 0
+
+    st_filtered = st_pure.filter(pl.col("inchi1") == inchi)
+    if st_filtered.height > 0:
+
+        st_range = st_filtered.height
+    else:
+        st_range = 0
+
+    return {"rho_range": rho_range, "vp_range": vp_range, "st_range": st_range}
+
+
+def _retrieve_available_data_binary(
+    smiles_list: list,
+) -> Dict[str, Optional[List[List[float]]]]:
+    "retrieve available binary data"
+
+    i1, i2 = smilestoinchi(smiles_list[0]), smilestoinchi(smiles_list[1])
+
+    rho_data = _build_binary_rho_data(i1, i2)
+    bubble_data = _build_binary_bubble_data(i1, i2)
+    lle_data = _build_binary_lle_data(i1, i2)
+    vle_data, vle_pxy_data = _build_binary_vle_data(i1, i2)
+
+    return {
+        "rho_px_data_b": rho_data,
+        "vle_x_data_b": bubble_data,
+        "lle_p_data_b": lle_data,
+        "vle_p_data_b": vle_data,
+        "vle_t_data_b": vle_pxy_data,
+    }
+
+
+def _retrieve_available_data_ternary(
+    smiles_list: list,
+) -> Dict[str, Optional[List[List[float]]]]:
+    "retrieve available ternary data"
+
+    target_set = [
+        smilestoinchi(smiles_list[0]),
+        smilestoinchi(smiles_list[1]),
+        smilestoinchi(smiles_list[2]),
+    ]
+
+    rho_data = _build_ternary_rho_data(target_set)
+    lle_data = _build_ternary_lle_data(target_set)
+    vle_pt_data, vle_tx_data = _build_ternary_vle_data(target_set)
+
+    return {
+        "rho_px_data_t": rho_data,
+        "lle_pt_data_t": lle_data,
+        "vle_pt_data_t": vle_pt_data,
+        "vle_tx_data_t": vle_tx_data,
+    }
+
+
 def default_mixture_output_args() -> (
     Dict[str, Optional[Union[List[List[float]], List[Tuple[str, List[float]]]]]]
 ):
@@ -368,47 +453,19 @@ def retrieve_available_data_pure(
         smiles: Component SMILES string.
     """
 
-    rho_pure = pl.read_parquet(osp.join(application_path, "_data", "rho_pure.parquet"))
-    vp_pure = pl.read_parquet(osp.join(application_path, "_data", "vp_pure.parquet"))
-    st_pure = pl.read_parquet(osp.join(application_path, "_data", "st_pure.parquet"))
-
-    inchi = smilestoinchi(smiles)
-
-    rho_filtered = rho_pure.filter(pl.col("inchi1") == inchi)
-    if rho_filtered.height > 0:
-        rho_range = (
-            rho_filtered.select("P_kPa")
-            .group_by(pl.col("P_kPa"))
-            .agg(pl.len().alias("count"))
-            .filter(pl.col("count") > 1)
-            .sort(pl.col("P_kPa"))
-            .to_numpy()
-            .tolist()
-        )
-    else:
-        rho_range = None
-
-    vp_filtered = vp_pure.filter(pl.col("inchi1") == inchi)
-    if vp_filtered.height > 0:
-        vp_range = vp_filtered.height
-    else:
-        vp_range = 0
-
-    st_filtered = st_pure.filter(pl.col("inchi1") == inchi)
-    if st_filtered.height > 0:
-
-        st_range = st_filtered.height
-    else:
-        st_range = 0
+    data_pure = _retrieve_available_data_pure(smiles=smiles)
 
     return {
         "density_data": (
-            [f"P (kPa) = {pkpa}, {count} data points" for pkpa, count in rho_range]
-            if rho_range
+            [
+                f"P (kPa) = {pkpa}, {count} data points"
+                for pkpa, count in data_pure["rho_range"]
+            ]
+            if isinstance(data_pure["rho_range"], List)
             else "0 data points"
         ),
-        "vapor_pressure_data": f"{vp_range} data points",
-        "surface_tension_data": f"{st_range} data points",
+        "vapor_pressure_data": f"{data_pure["vp_range"]} data points",
+        "surface_tension_data": f"{data_pure["st_range"]} data points",
     }
 
 
@@ -611,40 +668,47 @@ def retrieve_available_data_binary(
             preserved when reporting the composition of component 1.
     """
 
-    i1, i2 = smilestoinchi(smiles_list[0]), smilestoinchi(smiles_list[1])
-
-    rho_data = _build_binary_rho_data(i1, i2)
-    bubble_data = _build_binary_bubble_data(i1, i2)
-    lle_data = _build_binary_lle_data(i1, i2)
-    vle_data, vle_pxy_data = _build_binary_vle_data(i1, i2)
+    data_binary = _retrieve_available_data_binary(smiles_list=smiles_list)
 
     return {
         "density_px_data_b": (
             [
                 f"P (kPa) = {pkpa}, x_1 = {x1}, {count} data points"
-                for pkpa, x1, count in rho_data
+                for pkpa, x1, count in data_binary["rho_data"]
             ]
-            if rho_data is not None
+            if data_binary["rho_data"] is not None
             else "0 data points"
         ),
         "vle_x_data_b": (
-            [f"x_1 = {x}, {count} data points" for x, count in bubble_data]
-            if bubble_data
+            [
+                f"x_1 = {x}, {count} data points"
+                for x, count in data_binary["bubble_data"]
+            ]
+            if data_binary["bubble_data"]
             else "0 data points"
         ),
         "lle_p_data_b": (
-            [f"P (kPa = {pkpa}, {count} data points" for pkpa, count in lle_data]
-            if lle_data
+            [
+                f"P (kPa = {pkpa}, {count} data points"
+                for pkpa, count in data_binary["lle_data"]
+            ]
+            if data_binary["lle_data"]
             else "0 data points"
         ),
         "vle_p_data_b": (
-            [f"P (kPa) = {pkpa}, {count} data points" for pkpa, count in vle_data]
-            if vle_data
+            [
+                f"P (kPa) = {pkpa}, {count} data points"
+                for pkpa, count in data_binary["vle_data"]
+            ]
+            if data_binary["vle_data"]
             else "0 data points"
         ),
         "vle_t_data_b": (
-            [f"T (K) = {tk}, {count} data points" for tk, count in vle_pxy_data]
-            if vle_pxy_data
+            [
+                f"T (K) = {tk}, {count} data points"
+                for tk, count in data_binary["vle_pxy_data"]
+            ]
+            if data_binary["vle_pxy_data"]
             else "0 data points"
         ),
     }
@@ -672,48 +736,40 @@ def retrieve_available_data_ternary(
             the descriptions are mapped to this input order.
     """
 
-    target_set = [
-        smilestoinchi(smiles_list[0]),
-        smilestoinchi(smiles_list[1]),
-        smilestoinchi(smiles_list[2]),
-    ]
-
-    rho_data = _build_ternary_rho_data(target_set)
-    lle_data = _build_ternary_lle_data(target_set)
-    vle_pt_data, vle_tx_data = _build_ternary_vle_data(target_set)
+    data_ternary = _retrieve_available_data_binary(smiles_list=smiles_list)
 
     return {
         "rho_px_data_t": (
             [
                 f"P (kPa) = {pressure}, x_1 = {x1}, x_2 = {x2}, {count} data points"
-                for pressure, x1, x2, count in rho_data
+                for pressure, x1, x2, count in data_ternary["rho_data"]
             ]
-            if rho_data
+            if data_ternary["rho_data"]
             else "0 data points"
         ),
         "lle_pt_data_t": (
             [
                 f"P (kPa) = {pressure}, T (K) = {temperature}, {count} data points"
-                for pressure, temperature, count in lle_data
+                for pressure, temperature, count in data_ternary["lle_data"]
             ]
-            if lle_data
+            if data_ternary["lle_data"]
             else "0 data points"
         ),
         "vle_pt_data_t": (
             [
                 f"P (kPa) = {pressure}, T (K) = {temperature}, {count} data points"
-                for pressure, temperature, count in vle_pt_data
+                for pressure, temperature, count in data_ternary["vle_pt_data"]
             ]
-            if vle_pt_data
+            if data_ternary["vle_pt_data"]
             else "0 data points"
         ),
         "vle_tx_data_t": (
             [
                 f"T (K) = {temperature}, solvent ratio = {solvent_ratio}, "
                 f"{count} data points"
-                for temperature, solvent_ratio, count in vle_tx_data
+                for temperature, solvent_ratio, count in data_ternary["vle_tx_data"]
             ]
-            if vle_tx_data
+            if data_ternary["vle_tx_data"]
             else "0 data points"
         ),
     }
