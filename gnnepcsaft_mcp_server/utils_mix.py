@@ -15,6 +15,7 @@ from gnnepcsaft.pcsaft.pcsaft_feos import (
     mix_lle_diagram_feos,
     mix_lle_feos,
     mix_vle_diagram_feos,
+    mix_vlle_diagram_feos,
     mix_vp_feos,
     pure_vp_feos,
 )
@@ -552,6 +553,55 @@ def mix_vle(
                 "mix_vle: unexpected %s at pressure=%.4f",
                 exception_type,
                 pressure,
+            )
+            raise
+    return None
+
+
+def mix_vlle(
+    params: MixLLEParams,
+) -> Optional[
+    Tuple[Dict[str, List[float]], Dict[str, List[float]], Dict[str, List[float]]]
+]:
+    "Calculate mixture VLLE using PC-SAFT EOS"
+    parameters_list = [
+        predict_pcsaft_parameters(smiles) for smiles in params.smiles_list
+    ]
+
+    try:
+        return mix_vlle_diagram_feos(
+            parameters=parameters_list,
+            state=[params.temperature_min, params.pressure, *params.mole_fractions],
+            kij_matrix=params.kij_matrix,
+            npoints=params.npoints if params.npoints < 500 else 500,
+        )
+    except RuntimeError as exc:
+        logger.debug(
+            "mix_vlle: Runtime Error at temperature=%.4f, pressure=%.4f, molefractions=%s: %s",
+            params.temperature_min,
+            params.pressure,
+            params.mole_fractions,
+            exc,
+        )
+        raise
+    except BaseException as exc:  # pylint: disable=W0718
+        exception_type = type(exc).__name__
+        if exception_type == "PanicException":
+            logger.warning(
+                "mix_vlle: PanicException at temperature=%.4f, "
+                "pressure=%.4f, molefractions=%s: %s",
+                params.temperature_min,
+                params.pressure,
+                params.mole_fractions,
+                exc,
+            )
+        else:
+            logger.exception(
+                "mix_vlle: unexpected %s at temperature=%.4f, pressure=%.4f, molefractions=%s",
+                exception_type,
+                params.temperature_min,
+                params.pressure,
+                params.mole_fractions,
             )
             raise
     return None
