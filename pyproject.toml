@@ -1,6 +1,6 @@
 [project]
 name = "gnnepcsaft-mcp-server"
-version = "0.5.0"
+version = "0.5.1"
 description = "Model Context Protocol server for GNNPCSAFT tools"
 authors = [
     {name = "wildsonbbl",email = "wil_bbl@hotmail.com"}
@@ -20,7 +20,7 @@ dependencies = [
 gnnpcsaftmcp = 'gnnepcsaft_mcp_server.mcp_server:run'
 
 [tool.poetry]
-include = ["gnnepcsaft_mcp_server/models/assoc_8.onnx", "gnnepcsaft_mcp_server/models/msigmae_7.onnx"]
+include = ["gnnepcsaft_mcp_server/models/assoc_8.onnx", "gnnepcsaft_mcp_server/models/msigmae_7.onnx", "gnnepcsaft_mcp_server/_data"]
 
 
 
