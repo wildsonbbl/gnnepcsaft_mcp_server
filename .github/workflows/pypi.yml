@@ -10,19 +10,21 @@ on:
 
 jobs:
   publish:
-    runs-on: [ ubuntu-latest ]
+    runs-on: [ubuntu-latest]
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.13"
+          activate-environment: true
       - name: Download models from HuggingFace
         run: |
           git clone https://huggingface.co/wildsonbbl/gnnepcsaft  hfdata
           cp hfdata/*.onnx* ./gnnepcsaft_mcp_server/models
+          cp -R hfdata/_data ./gnnepcsaft_mcp_server
       - name: Unit tests
         run: |
           uv pip install pytest
