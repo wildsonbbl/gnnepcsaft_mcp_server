@@ -22,33 +22,6 @@ sys.modules["gnnepcsaft.pcsaft.pcsaft_feos"] = MagicMock()
 from gnnepcsaft_mcp_server import utils_mix, utils_pure
 
 
-class FakeArray:
-    """Minimal array-like for tests that require 2D slicing."""
-
-    class _FakeVector(list):
-        def __mul__(self, other):
-            return [value * other for value in self]
-
-        def __rmul__(self, other):
-            return [value * other for value in self]
-
-        def tolist(self):
-            return list(self)
-
-    def __init__(self, data):
-        self._data = data
-
-    def __len__(self):
-        return len(self._data)
-
-    def __getitem__(self, idx):
-        if isinstance(idx, tuple):
-            rows, col = idx
-            if isinstance(rows, slice):
-                return self._FakeVector([row[col] for row in self._data])
-        return self._data[idx]
-
-
 class TestUtilsPure(unittest.TestCase):
     "test utils_pure.py"
 
@@ -126,24 +99,6 @@ class TestUtilsMix(unittest.TestCase):
         res = utils_mix.mix_vle(["A", "B"], [[0, 0], [0, 0]], 101325, 10)
 
         self.assertEqual(res, expected_output)
-
-
-class DummyLabel:
-    """Simple label stand-in for UI builder tests."""
-
-    def __init__(self, **kwargs):
-        self.text = kwargs.get("text")
-        self.bind = MagicMock()
-
-    def setter(self, name):
-        return lambda *args, **kwargs: None
-
-
-class DummyGrid:
-    """Simple grid stand-in for UI builder tests."""
-
-    def __init__(self, **kwargs):
-        self.add_widget = MagicMock()
 
 
 if __name__ == "__main__":

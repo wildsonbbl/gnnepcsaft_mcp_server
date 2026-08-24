@@ -32,4 +32,6 @@ jobs:
           cp hfdata/*.onnx* ./gnnepcsaft_mcp_server/models
           cp -R hfdata/_data ./gnnepcsaft_mcp_server
       - name: Unit tests
-        run: pytest tests
+        run: |
+          pytest tests
+          uv run -m tests.test
