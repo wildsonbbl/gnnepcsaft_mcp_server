@@ -1,0 +1,35 @@
+name: Unit Tests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - "**.py"
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: true
+      - name: Install dependencies
+        run: |
+          uv pip install -r pyproject.toml
+          uv pip install pylint pytest
+      - name: Analysing the code with pylint
+        run: pylint $(git ls-files '*.py') --rcfile=.pylintrc
+      - name: Download models from HuggingFace
+        run: |
+          git clone https://huggingface.co/wildsonbbl/gnnepcsaft  hfdata
+          cp hfdata/*.onnx* ./gnnepcsaft_mcp_server/models
+          cp -R hfdata/_data ./gnnepcsaft_mcp_server
+      - name: Unit tests
+        run: pytest tests
