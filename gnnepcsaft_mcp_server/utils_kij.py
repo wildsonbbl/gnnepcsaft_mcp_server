@@ -8,6 +8,8 @@ from typing import List, Union
 
 import numpy as np
 from gnnepcsaft.pcsaft.pcsaft_feos import mix_vp_feos
+from numpy import float64
+from numpy.typing import NDArray
 from scipy.optimize import least_squares
 
 from . import logger
@@ -134,3 +136,45 @@ def optimize_binary_kij_with_vle(
             "Experimental data found for kij optimization "
             "but kij optimization failed, try another initial_kij"
         )
+
+
+def optimize_binary_kij_for_vle(
+    smiles_list: List[str],
+    initial_kij: float,
+    vle: NDArray[float64],
+) -> float:
+    """
+    Optimize the kij interaction parameter for a binary mixture with VLE
+        experimental data if available.
+
+    Args:
+        smiles_list (List[str]): List of SMILES strings [SMILE_1, SMILES_2] for the components.
+        initial_kij (float): Initial guess for the kij interaction parameter.
+        vle: Array of target VLE pressures.
+    """
+
+    parameters = [predict_pcsaft_parameters(smiles) for smiles in smiles_list]
+
+    x1s = vle[:, 0]
+    pressures = vle[:, 1]
+    temperatures = vle[:, 2]
+    try:
+        # Optimize
+        res = least_squares(
+            fun=_loss_fn_bubble_point,
+            x0=[initial_kij],
+            kwargs={
+                "params": parameters,
+                "x1": x1s,
+                "temperature": temperatures,
+                "pressure": pressures,
+            },
+            jac="2-point",
+            method="lm",
+            ftol=1e-8,
+            xtol=1e-8,
+        )
+        return res.x[0].item()
+
+    except RuntimeError:
+        return 0.0
