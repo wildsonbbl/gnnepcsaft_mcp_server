@@ -53,7 +53,7 @@ def predict_pcsaft_parameters(
     )
 
     assoc = 10 ** (
-        assoc_onnx.run(
+        assoc_onnx.run(  # type: ignore
             None,
             {
                 "x": x,
@@ -65,7 +65,7 @@ def predict_pcsaft_parameters(
     )
     if na == 0 and nb == 0:
         assoc *= 0
-    msigmae = msigmae_onnx.run(
+    msigmae = msigmae_onnx.run(  # type: ignore
         None,
         {
             "x": x,
