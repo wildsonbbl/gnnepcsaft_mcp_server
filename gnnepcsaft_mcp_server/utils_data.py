@@ -8,6 +8,7 @@ pressure using consistent tolerances.
 import os.path as osp
 from typing import Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import polars as pl
 from numpy import float64
 from numpy.typing import NDArray
@@ -570,6 +571,20 @@ def retrieve_lle_binary_data(
         return None
 
     return filtered.select("T_K", "x_c1").to_numpy()
+
+
+def retrieve_vlle_binary_data(
+    smiles_list: list, pressure: float
+) -> Optional[NDArray[float64]]:
+    "retrieve binary VLLE data"
+    if len(smiles_list) != 2:
+        return None
+
+    vle = retrieve_vle_binary_data(smiles_list=smiles_list, pressure=pressure)
+    lle = retrieve_lle_binary_data(smiles_list=smiles_list, pressure=pressure)
+    if lle is not None and vle is not None:
+        return np.vstack([vle, lle])
+    return None
 
 
 def retrieve_available_data_binary(
