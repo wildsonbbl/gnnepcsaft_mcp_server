@@ -1,6 +1,6 @@
 [project]
 name = "gnnepcsaft-mcp-server"
-version = "0.4.1"
+version = "0.5.0"
 description = "Model Context Protocol server for GNNPCSAFT tools"
 authors = [
     {name = "wildsonbbl",email = "wil_bbl@hotmail.com"}
@@ -12,6 +12,8 @@ dependencies = [
     "onnxruntime (>=1.21.0,<2.0.0)",
     "gnnepcsaft (>=0.3)",
     "mcp (>=1.6.0,<2.0.0)",
+    "polars",
+    "scipy",
 ]
 
 [project.scripts]
