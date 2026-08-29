@@ -2,7 +2,7 @@
 
 from typing import Any, Callable, List
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 from .utils import (
     batch_critical_points,
@@ -17,7 +17,7 @@ from .utils import (
     mixture_vapor_pressure,
 )
 
-mcp = MCPServer("gnnpcsaft")
+mcp = FastMCP("gnnpcsaft")
 fn_list: List[Callable[..., Any]] = [
     batch_predict_pcsaft_parameters,
     batch_critical_points,
