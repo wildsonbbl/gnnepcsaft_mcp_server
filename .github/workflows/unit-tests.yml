@@ -33,5 +33,5 @@ jobs:
           cp -R hfdata/_data ./gnnepcsaft_mcp_server
       - name: Unit tests
         run: |
-          pytest tests
+          uv run pytest tests
           uv run -m tests.test
