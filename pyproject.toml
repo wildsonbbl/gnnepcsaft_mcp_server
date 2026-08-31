@@ -42,7 +42,12 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pylint", "pytest"]
+dev = [
+    "pylint", 
+    "pytest",
+    "ipywidgets",
+    "matplotlib",
+]
 
 [project.urls]
 Repository = "https://github.com/wildsonbbl/gnnepcsaft_mcp_server"
