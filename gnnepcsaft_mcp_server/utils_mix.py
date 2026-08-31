@@ -116,6 +116,20 @@ class MixVpParams:
     npoints: int
 
 
+@dataclass
+class McCabeThieleParams:
+    """Inputs for a binary McCabe-Thiele distillation calculation."""
+
+    equilibrium_x: List[float]
+    equilibrium_y: List[float]
+    feed_composition: float
+    distillate_composition: float
+    bottoms_composition: float
+    reflux_ratio: float
+    feed_quality: float = 1.0
+    max_stages: int = 100
+
+
 def _binary_critical_points(
     parameters_list: List[List[float]],
 ) -> Tuple[List[float], List[float]]:
@@ -809,3 +823,127 @@ def mix_ternary_vle_tx_fixed(
     series = _build_ternary_vle_series(x1_grid, params.solvent_ratio, context)
 
     return series.x1_values, series.bubble_pressures, series.dew_pressures
+
+
+def mccabe_thiele(
+    params: McCabeThieleParams,
+) -> Dict[str, object]:
+    """Calculate binary distillation stages with the McCabe-Thiele method.
+
+    ``equilibrium_x`` and ``equilibrium_y`` define the liquid-vapor
+    equilibrium curve for the light component. The returned stage points are
+    suitable for plotting, with each horizontal segment representing an
+    equilibrium stage.
+    """
+    x_eq = np.asarray(params.equilibrium_x, dtype=float)
+    y_eq = np.asarray(params.equilibrium_y, dtype=float)
+    if x_eq.ndim != 1 or y_eq.ndim != 1 or len(x_eq) != len(y_eq) or len(x_eq) < 2:
+        raise ValueError(
+            "Equilibrium x and y must be equally sized 1-D arrays with at least two points"
+        )
+    if not np.all(np.isfinite(x_eq)) or not np.all(np.isfinite(y_eq)):
+        raise ValueError("Equilibrium x and y must contain only finite values")
+    if np.any(np.diff(x_eq) <= 0) or np.any(np.diff(y_eq) <= 0):
+        raise ValueError("Equilibrium x and y must be strictly increasing")
+    if x_eq[0] > 0.0 or x_eq[-1] < 1.0 or y_eq[0] > 0.0 or y_eq[-1] < 1.0:
+        raise ValueError("Equilibrium data must cover the composition range 0 to 1")
+
+    x_f = params.feed_composition
+    x_d = params.distillate_composition
+    x_b = params.bottoms_composition
+    q = params.feed_quality
+    reflux = params.reflux_ratio
+    if not all(np.isfinite(value) for value in (x_f, x_d, x_b)):
+        raise ValueError("Feed, distillate, and bottoms compositions must be finite")
+    if not 0.0 <= x_b < x_f < x_d <= 1.0:
+        raise ValueError("Require 0 <= bottoms < feed < distillate <= 1")
+    if reflux <= 0.0 or not np.isfinite(reflux):
+        raise ValueError("Reflux ratio must be finite and positive")
+    if not np.isfinite(q):
+        raise ValueError("Feed quality must be finite")
+    if params.max_stages < 1:
+        raise ValueError("max_stages must be at least 1")
+
+    rectifying_slope = reflux / (reflux + 1.0)
+    rectifying_intercept = x_d / (reflux + 1.0)
+
+    if np.isclose(q, 1.0):
+        feed_intersection_x = x_f
+        q_line = [None, x_f]
+    else:
+        q_slope = q / (q - 1.0)
+        q_intercept = -x_f / (q - 1.0)
+        line_denominator = rectifying_slope - q_slope
+        if np.isclose(line_denominator, 0.0):
+            raise ValueError("Rectifying and q-lines are parallel")
+        feed_intersection_x = (q_intercept - rectifying_intercept) / (line_denominator)
+        q_line = [q_slope, q_intercept]
+    feed_intersection_y = rectifying_slope * feed_intersection_x + rectifying_intercept
+    if not x_b < feed_intersection_x <= 1.0 or not 0.0 <= feed_intersection_y <= 1.0:
+        raise ValueError(
+            "Operating lines do not intersect within the composition range"
+        )
+
+    stripping_slope = (feed_intersection_y - x_b) / (feed_intersection_x - x_b)
+    stripping_intercept = x_b * (1.0 - stripping_slope)
+
+    def operating_line(x_value: float) -> float:
+        if x_value >= feed_intersection_x:
+            return rectifying_slope * x_value + rectifying_intercept
+        return stripping_slope * x_value + stripping_intercept
+
+    stage_x = [x_d]
+    stage_y = [x_d]
+    feed_stage = None
+    current_y = x_d
+    stages = 0
+    while stages < params.max_stages:
+        current_x = float(np.interp(current_y, y_eq, x_eq))
+        stage_x.extend([current_x, current_x])
+        stage_y.extend([current_y, operating_line(current_x)])
+        stages += 1
+        if feed_stage is None and current_x <= feed_intersection_x:
+            feed_stage = stages
+        if current_x <= x_b:
+            break
+        current_y = stage_y[-1]
+    else:
+        raise RuntimeError(
+            "Maximum number of stages reached before reaching bottoms composition"
+        )
+
+    return {
+        "number_of_stages": stages,
+        "feed_stage": feed_stage,
+        "stage_x": stage_x,
+        "stage_y": stage_y,
+        "rectifying_line": [rectifying_slope, rectifying_intercept],
+        "stripping_line": [stripping_slope, stripping_intercept],
+        "q_line": q_line,
+        "feed_intersection": [feed_intersection_x, feed_intersection_y],
+    }
+
+
+def distillation_column(
+    equilibrium_x: List[float],
+    equilibrium_y: List[float],
+    feed_composition: float,
+    distillate_composition: float,
+    bottoms_composition: float,
+    reflux_ratio: float,
+    feed_quality: float = 1.0,
+    max_stages: int = 100,
+) -> Dict[str, object]:
+    """Calculate a binary distillation column with McCabe-Thiele stepping."""
+    return mccabe_thiele(
+        McCabeThieleParams(
+            equilibrium_x=equilibrium_x,
+            equilibrium_y=equilibrium_y,
+            feed_composition=feed_composition,
+            distillate_composition=distillate_composition,
+            bottoms_composition=bottoms_composition,
+            reflux_ratio=reflux_ratio,
+            feed_quality=feed_quality,
+            max_stages=max_stages,
+        )
+    )
