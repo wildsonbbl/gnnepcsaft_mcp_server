@@ -2,14 +2,16 @@
 
 # pylint: disable=missing-class-docstring,missing-function-docstring,protected-access
 # pylint: disable=too-few-public-methods,unused-argument,wrong-import-position
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-public-methods
 # pylint: disable=unnecessary-lambda
 
+import json
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 sys.modules["polars"] = MagicMock()
 
@@ -22,6 +24,285 @@ sys.modules["gnnepcsaft.pcsaft.pcsaft_feos"] = MagicMock()
 
 # -- IMPORT MODULES TO TEST --
 from gnnepcsaft_mcp_server import utils_mix, utils_pure
+from gnnepcsaft_mcp_server.utils import (
+    batch_convert_pure_density_to_kg_per_m3,
+    batch_critical_points,
+    batch_inchi_to_smiles,
+    batch_molecular_weights,
+    batch_pa_to_bar,
+    batch_predict_pcsaft_parameters,
+    batch_pure_density,
+    batch_pure_h_lv,
+    batch_pure_vapor_pressure,
+    batch_smiles_to_inchi,
+    mixture_density,
+    mixture_phase,
+    mixture_vapor_pressure,
+    predict_pcsaft_parameters,
+    pubchem_description,
+    pure_phase,
+)
+
+METHANE_SMILES = "C"
+ETHANOL_SMILES = "CCO"
+WATER_SMILES = "O"
+TEST_SMILES_LIST = [METHANE_SMILES, ETHANOL_SMILES, WATER_SMILES]
+
+
+class TestUtilsCore(unittest.TestCase):
+    "Test direct utility functions from utils.py"
+
+    @patch("gnnepcsaft_mcp_server.utils.mw", return_value=16.04)
+    @patch("gnnepcsaft_mcp_server.utils.assoc_number", return_value=(0, 0))
+    @patch("gnnepcsaft_mcp_server.utils.smiles2graph")
+    @patch(
+        "gnnepcsaft_mcp_server.utils.smilestoinchi", return_value="InChI=1S/CH4/h1H4"
+    )
+    @patch("gnnepcsaft_mcp_server.utils.msigmae_onnx")
+    @patch("gnnepcsaft_mcp_server.utils.assoc_onnx")
+    def test_predict_pcsaft_parameters(
+        self,
+        mock_assoc_onnx,
+        mock_msigmae_onnx,
+        mock_smilestoinchi,
+        mock_smiles2graph,
+        mock_assoc_number,
+        mock_mw,
+    ):
+        mock_smiles2graph.return_value = {
+            "node_feat": np.zeros((1, 1)),
+            "edge_index": np.array([[0], [0]]),
+            "edge_feat": np.zeros((1, 1)),
+        }
+        mock_assoc_onnx.run.return_value = [np.array([0.0, 0.0])]
+        mock_msigmae_onnx.run.return_value = [np.array([[1.0, 3.7, 150.0]])]
+
+        params = predict_pcsaft_parameters(METHANE_SMILES)
+        self.assertIsInstance(params, list)
+        self.assertEqual(len(params), 9)
+        self.assertTrue(all(isinstance(p, float) for p in params))
+
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
+    def test_batch_predict_pcsaft_parameters(self, mock_predict):
+        mock_predict.side_effect = [
+            [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16.04],
+            [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0, 46.07],
+            [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0, 18.02],
+        ]
+
+        params_list = batch_predict_pcsaft_parameters(TEST_SMILES_LIST)
+        self.assertIsInstance(params_list, list)
+        self.assertEqual(len(params_list), len(TEST_SMILES_LIST))
+        self.assertTrue(all(len(params) == 9 for params in params_list))
+
+    def test_pure_phase_liquid(self):
+        self.assertEqual(
+            pure_phase(vapor_pressure=90000, system_pressure=100000), "liquid"
+        )
+
+    def test_pure_phase_vapor(self):
+        self.assertEqual(
+            pure_phase(vapor_pressure=110000, system_pressure=100000), "vapor"
+        )
+
+    def test_pure_phase_validation(self):
+        with pytest.raises(AssertionError):
+            pure_phase(-1, 100000)
+        with pytest.raises(AssertionError):
+            pure_phase(100000, -1)
+        with pytest.raises(AssertionError):
+            pure_phase("invalid", 100000)  # type: ignore[arg-type]
+
+    def test_mixture_phase_liquid(self):
+        self.assertEqual(
+            mixture_phase(bubble_point=90000, dew_point=120000, system_pressure=100000),
+            "liquid",
+        )
+
+    def test_mixture_phase_vapor(self):
+        self.assertEqual(
+            mixture_phase(
+                bubble_point=110000, dew_point=120000, system_pressure=100000
+            ),
+            "vapor",
+        )
+
+    def test_mixture_phase_two_phase(self):
+        self.assertEqual(
+            mixture_phase(bubble_point=110000, dew_point=90000, system_pressure=100000),
+            "two-phase",
+        )
+
+    def test_mixture_phase_validation(self):
+        with pytest.raises(AssertionError):
+            mixture_phase(-1, 100000, 100000)
+        with pytest.raises(AssertionError):
+            mixture_phase(100000, -1, 100000)
+        with pytest.raises(AssertionError):
+            mixture_phase(100000, 100000, -1)
+
+    @patch(
+        "gnnepcsaft_mcp_server.utils.smilestoinchi", return_value="InChI=1S/CH4/h1H4"
+    )
+    @patch("gnnepcsaft_mcp_server.utils.urlopen")
+    def test_pubchem_description_success(self, mock_urlopen, mock_smilestoinchi):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({"Test": "Data"}).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        result = pubchem_description(METHANE_SMILES)
+        self.assertEqual(result, {"Test": "Data"})
+
+    @patch("gnnepcsaft_mcp_server.utils.urlopen")
+    def test_pubchem_description_error(self, mock_urlopen):
+        mock_urlopen.side_effect = ValueError()
+
+        result = pubchem_description(METHANE_SMILES)
+        self.assertEqual(result, "no data available on this molecule in PubChem.")
+
+    @patch("gnnepcsaft_mcp_server.utils.mw", side_effect=[16.04, 46.07, 18.02])
+    @patch(
+        "gnnepcsaft_mcp_server.utils.smilestoinchi",
+        side_effect=[
+            "InChI=1S/CH4/h1H4",
+            "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+            "InChI=1S/H2O/h1H2",
+        ],
+    )
+    def test_batch_molecular_weights(self, mock_smilestoinchi, mock_mw):
+        weights = batch_molecular_weights(TEST_SMILES_LIST)
+        self.assertIsInstance(weights, list)
+        self.assertEqual(len(weights), len(TEST_SMILES_LIST))
+        self.assertTrue(all(isinstance(w, float) for w in weights))
+        self.assertTrue(15.5 < weights[0] < 16.5)
+
+    @patch("gnnepcsaft_mcp_server.utils.inchitosmiles", side_effect=["C", "CCO", "O"])
+    @patch(
+        "gnnepcsaft_mcp_server.utils.smilestoinchi",
+        side_effect=[
+            "InChI=1S/CH4/h1H4",
+            "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+            "InChI=1S/H2O/h1H2",
+        ],
+    )
+    def test_batch_inchi_to_smiles(self, mock_smilestoinchi, mock_inchitosmiles):
+        inchi_list = batch_smiles_to_inchi(TEST_SMILES_LIST)
+        smiles_list = batch_inchi_to_smiles(inchi_list)
+        self.assertEqual(len(smiles_list), len(TEST_SMILES_LIST))
+        self.assertTrue(all(isinstance(s, str) for s in smiles_list))
+
+    @patch(
+        "gnnepcsaft_mcp_server.utils.smilestoinchi",
+        side_effect=[
+            "InChI=1S/CH4/h1H4",
+            "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+            "InChI=1S/H2O/h1H2",
+        ],
+    )
+    def test_batch_smiles_to_inchi(self, mock_smilestoinchi):
+        inchi_list = batch_smiles_to_inchi(TEST_SMILES_LIST)
+        self.assertIsInstance(inchi_list, list)
+        self.assertEqual(len(inchi_list), len(TEST_SMILES_LIST))
+        self.assertTrue(all(isinstance(i, str) for i in inchi_list))
+        self.assertTrue(all(i.startswith("InChI=") for i in inchi_list))
+
+    @patch("gnnepcsaft_mcp_server.utils.mix_den_feos", return_value=850.0)
+    def test_mixture_density(self, mock_mix_den):
+        parameters = [
+            [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16.04],
+            [2.0, 3.5, 200.0, 0.01, 2000.0, 0.0, 1.0, 1.0, 46.07],
+        ]
+        state = [298.15, 101325, 0.5, 0.5]
+        kij_matrix = [[0.0, 0.0], [0.0, 0.0]]
+
+        density = mixture_density(parameters, state, kij_matrix)
+        self.assertIsInstance(density, float)
+        self.assertGreater(density, 0)
+
+    @patch("gnnepcsaft_mcp_server.utils.mix_vp_feos", return_value=(120000.0, 90000.0))
+    def test_mixture_vapor_pressure(self, mock_mix_vp):
+        parameters = [
+            [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0, 16.04],
+            [2.0, 3.5, 200.0, 0.01, 2000.0, 0.0, 1.0, 1.0, 46.07],
+        ]
+        state = [298.15, 0.0, 0.5, 0.5]
+        kij_matrix = [[0.0, 0.0], [0.0, 0.0]]
+
+        bubble_point, dew_point = mixture_vapor_pressure(parameters, state, kij_matrix)
+        self.assertIsInstance(bubble_point, float)
+        self.assertIsInstance(dew_point, float)
+        self.assertGreater(bubble_point, 0)
+        self.assertGreater(dew_point, 0)
+
+    @patch("gnnepcsaft_mcp_server.utils.pure_den_feos")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
+    def test_batch_pure_density(self, mock_predict, mock_den_feos):
+        mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        mock_den_feos.return_value = 500.0
+
+        state = [298.15, 101325]
+        densities = batch_pure_density(TEST_SMILES_LIST, state)
+
+        self.assertIsInstance(densities, list)
+        self.assertEqual(len(densities), len(TEST_SMILES_LIST))
+        self.assertTrue(all(d == 500.0 for d in densities))
+
+    @patch("gnnepcsaft_mcp_server.utils.pure_vp_feos")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
+    def test_batch_pure_vapor_pressure(self, mock_predict, mock_vp_feos):
+        mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        mock_vp_feos.return_value = 50000.0
+
+        temperature = 298.15
+        pressures = batch_pure_vapor_pressure(TEST_SMILES_LIST, temperature)
+
+        self.assertIsInstance(pressures, list)
+        self.assertEqual(len(pressures), len(TEST_SMILES_LIST))
+        self.assertTrue(all(p == 50000.0 for p in pressures))
+
+    @patch("gnnepcsaft_mcp_server.utils.pure_h_lv_feos")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
+    def test_batch_pure_h_lv(self, mock_predict, mock_h_lv_feos):
+        mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        mock_h_lv_feos.return_value = 20.0
+
+        temperature = 298.15
+        enthalpies = batch_pure_h_lv(TEST_SMILES_LIST, temperature)
+
+        self.assertIsInstance(enthalpies, list)
+        self.assertEqual(len(enthalpies), len(TEST_SMILES_LIST))
+        self.assertTrue(all(h == 20.0 for h in enthalpies))
+
+    @patch("gnnepcsaft_mcp_server.utils.critical_points_feos")
+    @patch("gnnepcsaft_mcp_server.utils.predict_pcsaft_parameters")
+    def test_batch_critical_points(self, mock_predict, mock_critical_points):
+        mock_predict.return_value = [1.0, 3.7, 150.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        mock_critical_points.return_value = [190.0, 4600000.0, 10200.0]
+
+        critical_points = batch_critical_points(TEST_SMILES_LIST)
+
+        self.assertIsInstance(critical_points, list)
+        self.assertEqual(len(critical_points), len(TEST_SMILES_LIST))
+        self.assertTrue(all(len(cp) == 3 for cp in critical_points))
+
+    def test_batch_pa_to_bar(self):
+        pa_values = [100000.0, 200000.0, 300000.0]
+        bar_values = batch_pa_to_bar(pa_values)
+        self.assertEqual(bar_values, [1.0, 2.0, 3.0])
+
+    def test_batch_convert_pure_density_to_kg_per_m3(self):
+        density_values = [1000.0, 2000.0, 3000.0]
+        mw_values = [16.04, 46.07, 18.02]
+        kg_per_m3_values = batch_convert_pure_density_to_kg_per_m3(
+            density_values, mw_values
+        )
+
+        self.assertIsInstance(kg_per_m3_values, list)
+        self.assertEqual(len(kg_per_m3_values), len(density_values))
+        self.assertEqual(
+            kg_per_m3_values,
+            [den * mw / 1000 for den, mw in zip(density_values, mw_values)],
+        )
 
 
 class TestUtilsPure(unittest.TestCase):
