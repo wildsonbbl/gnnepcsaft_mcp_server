@@ -1,11 +1,14 @@
 [project]
 name = "gnnepcsaft-mcp-server"
-version = "0.5.3"
-description = "Model Context Protocol server for GNNPCSAFT tools"
+version = "0.5.4"
+description = "Model Context Protocol server with GNNPCSAFT tools"
 authors = [
-    {name = "wildsonbbl",email = "wil_bbl@hotmail.com"}
+    {name = "wildsonbbl", email = "wil_bbl@hotmail.com"}
 ]
-license = {text = "GNU General Public License v3.0"}
+maintainers = [
+    {name = "wildsonbbl", email = "wil_bbl@hotmail.com"}
+]
+license = "GPL-3.0-or-later"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -15,17 +18,38 @@ dependencies = [
     "polars",
     "scipy",
 ]
+keywords = [
+    "pcsaft", 
+    "graph-neural-network", 
+    "gnn", 
+    "equation-of-state", 
+    "chemical-engineering", 
+    "thermodynamics", 
+    "mcp"
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Intended Audience :: AI enthusiasts",
+  "Topic :: Software Development :: MCP Tools",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+dev = ["pylint", "pytest"]
+
+[project.urls]
+Repository = "https://github.com/wildsonbbl/gnnepcsaft_mcp_server"
+Issues = "https://github.com/wildsonbbl/gnnepcsaft_mcp_server/issues"
 
 [project.scripts]
 gnnpcsaftmcp = 'gnnepcsaft_mcp_server.mcp_server:run'
 
 [tool.poetry]
 include = ["gnnepcsaft_mcp_server/models/assoc_8.onnx", "gnnepcsaft_mcp_server/models/msigmae_7.onnx", "gnnepcsaft_mcp_server/_data"]
-
-
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.5"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

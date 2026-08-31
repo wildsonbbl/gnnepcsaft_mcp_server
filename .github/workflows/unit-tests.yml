@@ -21,9 +21,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           activate-environment: true
       - name: Install dependencies
-        run: |
-          uv pip install -r pyproject.toml
-          uv pip install pylint pytest
+        run: uv pip install -r pyproject.toml --extra dev
       - name: Analysing the code with pylint
         run: pylint $(git ls-files '*.py') --rcfile=.pylintrc
       - name: Download models from HuggingFace
