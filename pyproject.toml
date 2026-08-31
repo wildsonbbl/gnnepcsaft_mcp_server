@@ -1,6 +1,6 @@
 [project]
 name = "gnnepcsaft-mcp-server"
-version = "0.5.4"
+version = "0.5.5"
 description = "Model Context Protocol server with GNNPCSAFT tools"
 authors = [
     {name = "wildsonbbl", email = "wil_bbl@hotmail.com"}
@@ -30,7 +30,9 @@ keywords = [
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
-  "Intended Audience :: AI enthusiasts",
+  "Intended Audience :: Education",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: Science/Research",
   "Topic :: Software Development :: MCP Tools",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
