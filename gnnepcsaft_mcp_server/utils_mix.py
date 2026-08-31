@@ -118,7 +118,28 @@ class MixVpParams:
 
 @dataclass
 class McCabeThieleParams:
-    """Inputs for a binary McCabe-Thiele distillation calculation."""
+    """Inputs for a binary McCabe-Thiele distillation calculation.
+
+    Parameters
+    ----------
+    equilibrium_x : List[float]
+        Liquid composition values x of the equilibrium curve.
+    equilibrium_y : List[float]
+        Vapor composition values y corresponding to each x in the equilibrium curve.
+    feed_composition : float
+        Feed mole fraction of the light component, x_F, in the feed stream.
+    distillate_composition : float
+        Target distillate mole fraction of the light component, x_D.
+    bottoms_composition : float
+        Target bottoms mole fraction of the light component, x_B.
+    reflux_ratio : float
+        External reflux ratio R = L/D, strictly positive for the rectifying section.
+    feed_quality : float, optional
+        Feed quality q parameter. q = 1 for saturated liquid, q = 0 for saturated
+        vapor, q > 1 for subcooled liquid, and q < 0 for superheated vapor.
+    max_stages : int, optional
+        Maximum number of stages allowed before stopping with an error.
+    """
 
     equilibrium_x: List[float]
     equilibrium_y: List[float]
@@ -828,12 +849,41 @@ def mix_ternary_vle_tx_fixed(
 def mccabe_thiele(
     params: McCabeThieleParams,
 ) -> Dict[str, object]:
-    """Calculate binary distillation stages with the McCabe-Thiele method.
+    """Calculate a binary distillation stage count with the McCabe-Thiele method.
 
-    ``equilibrium_x`` and ``equilibrium_y`` define the liquid-vapor
-    equilibrium curve for the light component. The returned stage points are
-    suitable for plotting, with each horizontal segment representing an
-    equilibrium stage.
+    This function builds the equilibrium curve, the rectifying and stripping operating
+    lines, and then steps horizontally/vertically between them to estimate the number
+    of ideal stages needed to achieve the specified distillate and bottoms compositions.
+
+    Parameters
+    ----------
+    params : McCabeThieleParams
+        Input data for the column:
+        - equilibrium_x, equilibrium_y: binary VLE curve for the light key
+        - feed_composition: feed light-key mole fraction x_F
+        - distillate_composition: distillate light-key mole fraction x_D
+        - bottoms_composition: bottoms light-key mole fraction x_B
+        - reflux_ratio: external reflux ratio R
+        - feed_quality: feed q parameter
+        - max_stages: maximum number of stages allowed
+
+    Returns
+    -------
+    Dict[str, object]
+        A dictionary with the computed stage geometry and summary data. It contains:
+        - "number_of_stages": total number of ideal stages counted
+        - "feed_stage": stage number where the feed stage is crossed, if any
+        - "stage_x": x coordinates of the stepped path used for plotting
+        - "stage_y": y coordinates of the stepped path used for plotting
+        - "rectifying_line": [slope, intercept] of the rectifying operating line
+        - "stripping_line": [slope, intercept] of the stripping operating line
+        - "q_line": [slope, intercept] of the feed line, or [None, x_F] for q = 1
+        - "feed_intersection": [x_int, y_int] intersection of the operating lines
+
+    Notes
+    -----
+    The path is constructed as a staircase on the x-y diagram. Each horizontal leg is
+    an equilibrium step and each vertical leg moves along the operating line.
     """
     x_eq = np.asarray(params.equilibrium_x, dtype=float)
     y_eq = np.asarray(params.equilibrium_y, dtype=float)
@@ -934,7 +984,46 @@ def distillation_column(
     feed_quality: float = 1.0,
     max_stages: int = 100,
 ) -> Dict[str, object]:
-    """Calculate a binary distillation column with McCabe-Thiele stepping."""
+    """Calculates the binary McCabe-Thiele distillation calculation.
+
+    Parameters
+    ----------
+    equilibrium_x : List[float]
+        Liquid compositions x of the VLE curve, typically from ``mix_vle(...)["x0"]``.
+    equilibrium_y : List[float]
+        Vapor compositions y of the VLE curve, typically from ``mix_vle(...)["y0"]``.
+    feed_composition : float
+        Feed light-key mole fraction x_F.
+    distillate_composition : float
+        Distillate light-key mole fraction x_D.
+    bottoms_composition : float
+        Bottoms light-key mole fraction x_B.
+    reflux_ratio : float
+        Reflux ratio R = L/D.
+    feed_quality : float, optional
+        Feed quality parameter q. Defaults to 1.0 for saturated liquid feed.
+    max_stages : int, optional
+        Maximum number of ideal stages to permit before failing. Defaults to 100.
+
+    Returns
+    -------
+    Dict[str, object]
+        Structured result from ``mccabe_thiele`` containing the stage count and the
+        plotting coordinates for the McCabe-Thiele staircase.
+
+    Examples
+    --------
+    >>> result = distillation_column(
+    ...     equilibrium_x=[0.0, 0.2, 0.5, 0.8, 1.0],
+    ...     equilibrium_y=[0.0, 0.35, 0.7, 0.9, 1.0],
+    ...     feed_composition=0.45,
+    ...     distillate_composition=0.9,
+    ...     bottoms_composition=0.05,
+    ...     reflux_ratio=2.0,
+    ... )
+    >>> result["number_of_stages"]
+    14
+    """
     return mccabe_thiele(
         McCabeThieleParams(
             equilibrium_x=equilibrium_x,
