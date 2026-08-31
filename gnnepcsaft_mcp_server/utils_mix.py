@@ -1008,8 +1008,15 @@ def distillation_column(
     Returns
     -------
     Dict[str, object]
-        Structured result from ``mccabe_thiele`` containing the stage count and the
-        plotting coordinates for the McCabe-Thiele staircase.
+        A dictionary with the computed stage geometry and summary data. It contains:
+        - "number_of_stages": total number of ideal stages counted
+        - "feed_stage": stage number where the feed stage is crossed, if any
+        - "stage_x": x coordinates of the stepped path used for plotting
+        - "stage_y": y coordinates of the stepped path used for plotting
+        - "rectifying_line": [slope, intercept] of the rectifying operating line
+        - "stripping_line": [slope, intercept] of the stripping operating line
+        - "q_line": [slope, intercept] of the feed line, or [None, x_F] for q = 1
+        - "feed_intersection": [x_int, y_int] intersection of the operating lines
 
     Examples
     --------
