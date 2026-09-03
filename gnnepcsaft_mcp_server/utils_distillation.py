@@ -5,7 +5,7 @@ calculations using PC-SAFT models.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -45,6 +45,208 @@ class McCabeThieleParams:
     max_stages: int = 100
 
 
+@dataclass
+class OperatingLineData:
+    """Operating-line geometry for the McCabe-Thiele construction."""
+
+    rectifying_slope: float
+    rectifying_intercept: float
+    stripping_slope: float
+    stripping_intercept: float
+    feed_intersection_x: float
+    feed_intersection_y: float
+    q_line: List[float]
+    feed_intersection: List[float]
+
+
+@dataclass
+class StageData:
+    """Stepped stage path produced during the McCabe-Thiele calculation."""
+
+    stage_x: List[float]
+    stage_y: List[float]
+    feed_stage: int
+    stages: int
+
+
+def _validate_equilibrium_data(
+    equilibrium_x: List[float],
+    equilibrium_y: List[float],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Validate and normalize the equilibrium curve inputs."""
+    x_eq = np.asarray(equilibrium_x, dtype=float)
+    y_eq = np.asarray(equilibrium_y, dtype=float)
+    if x_eq.ndim != 1 or y_eq.ndim != 1 or len(x_eq) != len(y_eq) or len(x_eq) < 2:
+        raise ValueError(
+            "Equilibrium x and y must be equally sized 1-D arrays with at least two points"
+        )
+    if not np.all(np.isfinite(x_eq)) or not np.all(np.isfinite(y_eq)):
+        raise ValueError("Equilibrium x and y must contain only finite values")
+    if np.any(np.diff(x_eq) <= 0) or np.any(np.diff(y_eq) <= 0):
+        raise ValueError("Equilibrium x and y must be strictly increasing")
+    if x_eq[0] > 0.0 or x_eq[-1] < 1.0 or y_eq[0] > 0.0 or y_eq[-1] < 1.0:
+        raise ValueError("Equilibrium data must cover the composition range 0 to 1")
+    return x_eq, y_eq
+
+
+def _validate_distillation_inputs(
+    feed_composition: float,
+    distillate_composition: float,
+    bottoms_composition: float,
+    feed_quality: float,
+    reflux_ratio: float,
+    max_stages: int,
+) -> Tuple[float, float, float, float, float, int]:
+    """Validate the process parameters for the distillation calculation."""
+    if not all(
+        np.isfinite(value)
+        for value in (feed_composition, distillate_composition, bottoms_composition)
+    ):
+        raise ValueError("Feed, distillate, and bottoms compositions must be finite")
+    if (
+        not 0.0
+        <= bottoms_composition
+        < feed_composition
+        < distillate_composition
+        <= 1.0
+    ):
+        raise ValueError("Require 0 <= bottoms < feed < distillate <= 1")
+    if reflux_ratio <= 0.0 or not np.isfinite(reflux_ratio):
+        raise ValueError("Reflux ratio must be finite and positive")
+    if not np.isfinite(feed_quality):
+        raise ValueError("Feed quality must be finite")
+    if max_stages < 1:
+        raise ValueError("max_stages must be at least 1")
+    return (
+        feed_composition,
+        distillate_composition,
+        bottoms_composition,
+        feed_quality,
+        reflux_ratio,
+        max_stages,
+    )
+
+
+# pylint: disable=too-many-locals
+def _compute_operating_lines(
+    feed_composition: float,
+    distillate_composition: float,
+    bottoms_composition: float,
+    feed_quality: float,
+    reflux_ratio: float,
+) -> OperatingLineData:
+    """Compute the operating and feed lines for the McCabe-Thiele construction."""
+    rectifying_slope = reflux_ratio / (reflux_ratio + 1.0)
+    rectifying_intercept = distillate_composition / (reflux_ratio + 1.0)
+
+    if np.isclose(feed_quality, 1.0):
+        feed_intersection_x = feed_composition
+        q_line = [None, feed_composition]
+    else:
+        q_slope = feed_quality / (feed_quality - 1.0)
+        q_intercept = -feed_composition / (feed_quality - 1.0)
+        line_denominator = rectifying_slope - q_slope
+        if np.isclose(line_denominator, 0.0):
+            raise ValueError("Rectifying and q-lines are parallel")
+        feed_intersection_x = (q_intercept - rectifying_intercept) / line_denominator
+        q_line = [q_slope, q_intercept]
+
+    feed_intersection_y = rectifying_slope * feed_intersection_x + rectifying_intercept
+    if (
+        not bottoms_composition < feed_intersection_x <= 1.0
+        or not 0.0 <= feed_intersection_y <= 1.0
+    ):
+        raise ValueError(
+            "Operating lines do not intersect within the composition range"
+        )
+
+    stripping_slope = (feed_intersection_y - bottoms_composition) / (
+        feed_intersection_x - bottoms_composition
+    )
+    stripping_intercept = bottoms_composition * (1.0 - stripping_slope)
+    return OperatingLineData(
+        rectifying_slope=rectifying_slope,
+        rectifying_intercept=rectifying_intercept,
+        stripping_slope=stripping_slope,
+        stripping_intercept=stripping_intercept,
+        feed_intersection_x=feed_intersection_x,
+        feed_intersection_y=feed_intersection_y,
+        q_line=q_line,
+        feed_intersection=[feed_intersection_x, feed_intersection_y],
+    )
+
+
+def _operating_line_value(
+    x_value: float,
+    feed_intersection_x: float,
+    rectifying_slope: float,
+    rectifying_intercept: float,
+    stripping_slope: float,
+    stripping_intercept: float,
+) -> float:
+    """Evaluate the active operating line at a given x-position."""
+    if x_value >= feed_intersection_x:
+        return rectifying_slope * x_value + rectifying_intercept
+    return stripping_slope * x_value + stripping_intercept
+
+
+def _simulate_stages(
+    x_eq: np.ndarray,
+    y_eq: np.ndarray,
+    distillate_composition: float,
+    bottoms_composition: float,
+    max_stages: int,
+    feed_intersection_x: float,
+    rectifying_slope: float,
+    rectifying_intercept: float,
+    stripping_slope: float,
+    stripping_intercept: float,
+) -> StageData:
+    """Step the McCabe-Thiele staircase until the bottoms composition is reached."""
+    stage_x = [distillate_composition]
+    stage_y = [distillate_composition]
+    feed_stage = None
+    current_y = distillate_composition
+    stages = 0
+
+    while stages < max_stages:
+        current_x = float(np.interp(current_y, y_eq, x_eq))
+        stage_x.extend([current_x, current_x])
+        stage_y.extend(
+            [
+                current_y,
+                _operating_line_value(
+                    current_x,
+                    feed_intersection_x,
+                    rectifying_slope,
+                    rectifying_intercept,
+                    stripping_slope,
+                    stripping_intercept,
+                ),
+            ]
+        )
+        stages += 1
+        if feed_stage is None and current_x <= feed_intersection_x:
+            feed_stage = stages
+        if current_x <= bottoms_composition:
+            break
+        current_y = stage_y[-1]
+    else:
+        raise RuntimeError(
+            "Maximum number of stages reached before reaching bottoms composition"
+        )
+
+    if feed_stage is None:
+        feed_stage = 0
+    return StageData(
+        stage_x=stage_x,
+        stage_y=stage_y,
+        feed_stage=feed_stage,
+        stages=stages,
+    )
+
+
+# pylint: disable=too-many-locals
 def mccabe_thiele(
     params: McCabeThieleParams,
 ) -> Dict[str, object]:
@@ -84,92 +286,51 @@ def mccabe_thiele(
     The path is constructed as a staircase on the x-y diagram. Each horizontal leg is
     an equilibrium step and each vertical leg moves along the operating line.
     """
-    x_eq = np.asarray(params.equilibrium_x, dtype=float)
-    y_eq = np.asarray(params.equilibrium_y, dtype=float)
-    if x_eq.ndim != 1 or y_eq.ndim != 1 or len(x_eq) != len(y_eq) or len(x_eq) < 2:
-        raise ValueError(
-            "Equilibrium x and y must be equally sized 1-D arrays with at least two points"
-        )
-    if not np.all(np.isfinite(x_eq)) or not np.all(np.isfinite(y_eq)):
-        raise ValueError("Equilibrium x and y must contain only finite values")
-    if np.any(np.diff(x_eq) <= 0) or np.any(np.diff(y_eq) <= 0):
-        raise ValueError("Equilibrium x and y must be strictly increasing")
-    if x_eq[0] > 0.0 or x_eq[-1] < 1.0 or y_eq[0] > 0.0 or y_eq[-1] < 1.0:
-        raise ValueError("Equilibrium data must cover the composition range 0 to 1")
-
-    x_f = params.feed_composition
-    x_d = params.distillate_composition
-    x_b = params.bottoms_composition
-    q = params.feed_quality
-    reflux = params.reflux_ratio
-    if not all(np.isfinite(value) for value in (x_f, x_d, x_b)):
-        raise ValueError("Feed, distillate, and bottoms compositions must be finite")
-    if not 0.0 <= x_b < x_f < x_d <= 1.0:
-        raise ValueError("Require 0 <= bottoms < feed < distillate <= 1")
-    if reflux <= 0.0 or not np.isfinite(reflux):
-        raise ValueError("Reflux ratio must be finite and positive")
-    if not np.isfinite(q):
-        raise ValueError("Feed quality must be finite")
-    if params.max_stages < 1:
-        raise ValueError("max_stages must be at least 1")
-
-    rectifying_slope = reflux / (reflux + 1.0)
-    rectifying_intercept = x_d / (reflux + 1.0)
-
-    if np.isclose(q, 1.0):
-        feed_intersection_x = x_f
-        q_line = [None, x_f]
-    else:
-        q_slope = q / (q - 1.0)
-        q_intercept = -x_f / (q - 1.0)
-        line_denominator = rectifying_slope - q_slope
-        if np.isclose(line_denominator, 0.0):
-            raise ValueError("Rectifying and q-lines are parallel")
-        feed_intersection_x = (q_intercept - rectifying_intercept) / (line_denominator)
-        q_line = [q_slope, q_intercept]
-    feed_intersection_y = rectifying_slope * feed_intersection_x + rectifying_intercept
-    if not x_b < feed_intersection_x <= 1.0 or not 0.0 <= feed_intersection_y <= 1.0:
-        raise ValueError(
-            "Operating lines do not intersect within the composition range"
-        )
-
-    stripping_slope = (feed_intersection_y - x_b) / (feed_intersection_x - x_b)
-    stripping_intercept = x_b * (1.0 - stripping_slope)
-
-    def operating_line(x_value: float) -> float:
-        if x_value >= feed_intersection_x:
-            return rectifying_slope * x_value + rectifying_intercept
-        return stripping_slope * x_value + stripping_intercept
-
-    stage_x = [x_d]
-    stage_y = [x_d]
-    feed_stage = None
-    current_y = x_d
-    stages = 0
-    while stages < params.max_stages:
-        current_x = float(np.interp(current_y, y_eq, x_eq))
-        stage_x.extend([current_x, current_x])
-        stage_y.extend([current_y, operating_line(current_x)])
-        stages += 1
-        if feed_stage is None and current_x <= feed_intersection_x:
-            feed_stage = stages
-        if current_x <= x_b:
-            break
-        current_y = stage_y[-1]
-    else:
-        raise RuntimeError(
-            "Maximum number of stages reached before reaching bottoms composition"
-        )
+    x_eq, y_eq = _validate_equilibrium_data(params.equilibrium_x, params.equilibrium_y)
+    (
+        x_f,
+        x_d,
+        x_b,
+        q,
+        reflux,
+        max_stages,
+    ) = _validate_distillation_inputs(
+        params.feed_composition,
+        params.distillate_composition,
+        params.bottoms_composition,
+        params.feed_quality,
+        params.reflux_ratio,
+        params.max_stages,
+    )
+    line_data = _compute_operating_lines(x_f, x_d, x_b, q, reflux)
+    stage_data = _simulate_stages(
+        x_eq,
+        y_eq,
+        x_d,
+        x_b,
+        max_stages,
+        line_data.feed_intersection_x,
+        line_data.rectifying_slope,
+        line_data.rectifying_intercept,
+        line_data.stripping_slope,
+        line_data.stripping_intercept,
+    )
 
     return {
-        "number_of_stages": stages,
-        "feed_stage": feed_stage,
-        "stage_x": stage_x,
-        "stage_y": stage_y,
-        "rectifying_line": [rectifying_slope, rectifying_intercept],
-        "stripping_line": [stripping_slope, stripping_intercept],
-        "q_line": q_line,
-        "feed_intersection": [feed_intersection_x, feed_intersection_y],
+        "number_of_stages": stage_data.stages,
+        "feed_stage": stage_data.feed_stage,
+        "stage_x": stage_data.stage_x,
+        "stage_y": stage_data.stage_y,
+        "rectifying_line": [
+            line_data.rectifying_slope,
+            line_data.rectifying_intercept,
+        ],
+        "stripping_line": [
+            line_data.stripping_slope,
+            line_data.stripping_intercept,
+        ],
+        "q_line": line_data.q_line,
+        "feed_intersection": line_data.feed_intersection,
     }
 
 
