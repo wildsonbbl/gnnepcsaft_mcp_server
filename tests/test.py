@@ -25,11 +25,9 @@ sys.modules["gnnepcsaft.pcsaft.pcsaft_feos"] = MagicMock()
 # -- IMPORT MODULES TO TEST --
 from gnnepcsaft_mcp_server import utils_mix, utils_pure
 from gnnepcsaft_mcp_server.utils import (
-    batch_convert_pure_density_to_kg_per_m3,
     batch_critical_points,
     batch_inchi_to_smiles,
     batch_molecular_weights,
-    batch_pa_to_bar,
     batch_predict_pcsaft_parameters,
     batch_pure_density,
     batch_pure_h_lv,
@@ -284,25 +282,6 @@ class TestUtilsCore(unittest.TestCase):
         self.assertIsInstance(critical_points, list)
         self.assertEqual(len(critical_points), len(TEST_SMILES_LIST))
         self.assertTrue(all(len(cp) == 3 for cp in critical_points))
-
-    def test_batch_pa_to_bar(self):
-        pa_values = [100000.0, 200000.0, 300000.0]
-        bar_values = batch_pa_to_bar(pa_values)
-        self.assertEqual(bar_values, [1.0, 2.0, 3.0])
-
-    def test_batch_convert_pure_density_to_kg_per_m3(self):
-        density_values = [1000.0, 2000.0, 3000.0]
-        mw_values = [16.04, 46.07, 18.02]
-        kg_per_m3_values = batch_convert_pure_density_to_kg_per_m3(
-            density_values, mw_values
-        )
-
-        self.assertIsInstance(kg_per_m3_values, list)
-        self.assertEqual(len(kg_per_m3_values), len(density_values))
-        self.assertEqual(
-            kg_per_m3_values,
-            [den * mw / 1000 for den, mw in zip(density_values, mw_values)],
-        )
 
 
 class TestUtilsPure(unittest.TestCase):
