@@ -1,6 +1,6 @@
 [project]
 name = "gnnepcsaft-mcp-server"
-version = "0.5.6"
+version = "0.5.7"
 description = "Model Context Protocol server with GNNPCSAFT tools"
 authors = [
     {name = "wildsonbbl", email = "wil_bbl@hotmail.com"}
