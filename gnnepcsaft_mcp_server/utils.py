@@ -159,10 +159,10 @@ def mixture_density(
     Args:
         parameters: A list of
          `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
-         for each component of the mixture
+         for each component of the mixture.
         state: A list with the state of the mixture
-         `[Temperature (K), Pressure (Pa), mole_fractions_1, mole_fractions_2, ...]`
-        kij_matrix: A matrix of binary interaction parameters
+         `[Temperature (K), Pressure (Pa), mole_fractions_1, mole_fractions_2, ...]`.
+        kij_matrix: A matrix of binary interaction parameters.
     """
 
     return mix_den_feos(parameters, state, kij_matrix)
@@ -178,7 +178,7 @@ def mixture_vapor_pressure(
     Args:
         parameters: A list of
          `[m, sigma, epsilon/kB, kappa_ab, epsilon_ab/kB, dipole moment, na, nb, MW]`
-         for each component of the mixture
+         for each component of the mixture.
         state: A list with the state of the mixture
          `[Temperature (K), Pressure (Pa), mole_fractions_1, molefractions_2, ...]`.
          The pressure should be any `float` value since it's not used in the calculation.
@@ -204,7 +204,7 @@ def batch_predict_pcsaft_parameters(
 def batch_molecular_weights(
     smiles: List[str],
 ) -> List[float]:
-    """Calcultes molecular weight in `g/mol` for a list of SMILES
+    """Calcultes molecular weight in `g/mol` for a list of SMILES.
 
     Args:
       smiles (List[str]): SMILES of the molecules.
@@ -219,7 +219,7 @@ def batch_inchi_to_smiles(
     """Transform a list of InChI to SMILES.
 
     Args:
-        inchi_list (List[str]): List of InChI
+        inchi_list (List[str]): List of InChI.
     """
     return [inchitosmiles(inchi) for inchi in inchi_list]
 
@@ -230,7 +230,7 @@ def batch_smiles_to_inchi(
     """Transform a list of SMILES to InChI.
 
     Args:
-        smiles_list (List[str]): List of SMILES
+        smiles_list (List[str]): List of SMILES.
     """
     return [smilestoinchi(smi) for smi in smiles_list]
 
@@ -244,9 +244,9 @@ def batch_pure_density(
     PCSAFT parameters.
 
     Args:
-        smiles_list (List[str]): List of SMILES
+        smiles_list (List[str]): List of SMILES.
         state: A list with
-         `[Temperature (K), Pressure (Pa)]`
+         `[Temperature (K), Pressure (Pa)]`.
     """
     return [pure_den_feos(predict_pcsaft_parameters(smi), state) for smi in smiles_list]
 
@@ -260,8 +260,8 @@ def batch_pure_vapor_pressure(
     PCSAFT parameters.
 
     Args:
-        smiles_list (List[str]): List of SMILES
-        temperature: `Temperature (K)`
+        smiles_list (List[str]): List of SMILES.
+        temperature: `Temperature (K)`.
     """
     return [
         pure_vp_feos(predict_pcsaft_parameters(smi), [temperature])
@@ -280,8 +280,8 @@ def batch_pure_h_lv(
     PCSAFT parameters.
 
     Args:
-        smiles_list (List[str]): List of SMILES
-        temperature: `Temperature (K)`
+        smiles_list (List[str]): List of SMILES.
+        temperature: `Temperature (K)`.
     """
     return [
         pure_h_lv_feos(predict_pcsaft_parameters(smi), [temperature])
@@ -297,30 +297,6 @@ def batch_critical_points(
     for a list of SMILES. The GNNPCSAFT model is used to predict PCSAFT parameters.
 
     Args:
-        smiles_list (List[str]): List of SMILES
+        smiles_list (List[str]): List of SMILES.
     """
     return [critical_points_feos(predict_pcsaft_parameters(smi)) for smi in smiles_list]
-
-
-def batch_pa_to_bar(
-    pressure_in_pa_list: List[float],
-) -> List[float]:
-    """Convert a list of pressure from `Pa` to `bar`.
-
-    Args:
-        pressure_in_pa_list (List[float]): List of pressure in `Pa`
-    """
-    return [pa / 100_000.0 for pa in pressure_in_pa_list]
-
-
-def batch_convert_pure_density_to_kg_per_m3(
-    density_list: List[float],
-    molecular_weight_list: List[float],
-) -> List[float]:
-    """Convert a list of density from `mol/m³` to `kg/m³`
-
-    Args:
-        density_list (List[float]): List of density in `mol/m³`
-        molecular_weight_list (List[float]): List of molecular weight in `g/mol`
-    """
-    return [den * molw / 1000 for den, molw in zip(density_list, molecular_weight_list)]
