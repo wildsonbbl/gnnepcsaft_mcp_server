@@ -803,8 +803,7 @@ def mix_ternary_vle_tx_fixed(
     """
     Calculate ternary isothermal VLE curve (P-x) at fixed solvent ratio.
 
-    solvent_ratio = x2 / (x2 + x3). The first component is scanned in composition.
-    Uses values from the provided params dataclass.
+    Solvent_ratio = x2 / (x2 + x3). The first component is scanned in composition.
     """
     parameters_list = [
         predict_pcsaft_parameters(smiles) for smiles in params.smiles_list
