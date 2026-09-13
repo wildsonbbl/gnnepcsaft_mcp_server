@@ -545,7 +545,7 @@ class TestUtilsMix(unittest.TestCase):
         self.assertEqual(len(dps), len(xs))
 
     @patch("gnnepcsaft_mcp_server.utils_mix.predict_pcsaft_parameters")
-    @patch("gnnepcsaft_mcp_server.utils_mix._get_ternary_lle_data")
+    @patch("gnnepcsaft_mcp_server.utils_mix._get_ternary_vle_or_lle_data")
     def test_mix_ternary_lle(self, mock_data, mock_predict):
         """Test Ternary Liquid-Liquid Equilibrium Logic"""
         mock_predict.side_effect = [[1, 2, 3], [1, 2, 3], [1, 2, 3]]
