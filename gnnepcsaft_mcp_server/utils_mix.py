@@ -693,7 +693,7 @@ def mix_lle(
     return None
 
 
-def _get_ternary_lle_data(
+def _get_ternary_vle_or_lle_data(
     params: List[List[float]],
     state: List[float],
     kij_matrix: List[List[float]],
@@ -712,7 +712,7 @@ def _get_ternary_lle_data(
         ternary_data = {"x0": [], "x1": [], "x2": [], "y0": [], "y1": [], "y2": []}
         for i, j in valid_idx:
             try:
-                lle = mix_lle_feos(
+                lle = mix_lle_feos(  # this also calculates vle at T and P
                     params,
                     [t, p, x1_m[i, j].item(), x2_m[i, j].item(), x3_m[i, j].item()],
                     kij_matrix,
@@ -723,7 +723,7 @@ def _get_ternary_lle_data(
                 exception_type = type(exc).__name__
                 if exception_type == "PanicException":
                     logger.warning(
-                        "mix_ternary_lle: PanicException at temperature=%.4f, "
+                        "_get_ternary_vle_or_lle_data: PanicException at temperature=%.4f, "
                         "pressure=%.4f, molefractions=%s: %s",
                         t,
                         p,
@@ -732,7 +732,7 @@ def _get_ternary_lle_data(
                     )
                     continue
                 logger.exception(
-                    "mix_ternary_lle: unexpected %s at temperature=%.4f, "
+                    "_get_ternary_vle_or_lle_data: unexpected %s at temperature=%.4f, "
                     "pressure=%.4f, molefractions=%s",
                     exception_type,
                     t,
@@ -768,10 +768,28 @@ def mix_ternary_lle(
     pressure: float,
     npoints: int,
 ) -> Dict[str, List[float]]:
-    "Calculate ternary LLE/VLE using PC-SAFT EOS"
+    "Calculate ternary LLE using PC-SAFT EOS"
     parameters_list = [predict_pcsaft_parameters(smiles) for smiles in smiles_list]
 
-    return _get_ternary_lle_data(
+    return _get_ternary_vle_or_lle_data(
+        params=parameters_list,
+        state=[temperature, pressure],
+        kij_matrix=kij_matrix,
+        npoints=npoints if npoints < 100 else 100,
+    )
+
+
+def mix_ternary_vle(
+    smiles_list: List[str],
+    kij_matrix: List[List[float]],
+    temperature: float,
+    pressure: float,
+    npoints: int,
+) -> Dict[str, List[float]]:
+    "Calculate ternary VLE using PC-SAFT EOS"
+    parameters_list = [predict_pcsaft_parameters(smiles) for smiles in smiles_list]
+
+    return _get_ternary_vle_or_lle_data(
         params=parameters_list,
         state=[temperature, pressure],
         kij_matrix=kij_matrix,
