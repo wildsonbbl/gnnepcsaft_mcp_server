@@ -5,7 +5,7 @@ calculations using PC-SAFT models.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
@@ -343,7 +343,7 @@ def distillation_column(
     reflux_ratio: float,
     feed_quality: float = 1.0,
     max_stages: int = 100,
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     """Calculates the binary McCabe-Thiele distillation calculation.
 
     Parameters
