@@ -249,7 +249,7 @@ def _simulate_stages(
 # pylint: disable=too-many-locals
 def mccabe_thiele(
     params: McCabeThieleParams,
-) -> Dict[str, object]:
+) -> Dict[str, Any]:
     """Calculate a binary distillation stage count with the McCabe-Thiele method.
 
     This function builds the equilibrium curve, the rectifying and stripping operating
@@ -270,7 +270,7 @@ def mccabe_thiele(
 
     Returns
     -------
-    Dict[str, object]
+    Dict[str, Any]
         A dictionary with the computed stage geometry and summary data. It contains:
         - "number_of_stages": total number of ideal stages counted
         - "feed_stage": stage number where the feed stage is crossed, if any
@@ -367,7 +367,7 @@ def distillation_column(
 
     Returns
     -------
-    Dict[str, object]
+    Dict[str, Any]
         A dictionary with the computed stage geometry and summary data. It contains:
         - "number_of_stages": total number of ideal stages counted
         - "feed_stage": stage number where the feed stage is crossed, if any
