@@ -7,24 +7,105 @@ interaction parameter against available vapor–liquid equilibrium data.
 from typing import List, Union
 
 import numpy as np
-from gnnepcsaft.pcsaft.pcsaft_feos import mix_vp_feos
+from gnnepcsaft.pcsaft.pcsaft_feos import is_stable_feos, mix_tp_flash_feos, mix_vp_feos
 from numpy import float64
 from numpy.typing import NDArray
 from scipy.optimize import least_squares
 
 from . import logger
 from .utils import predict_pcsaft_parameters
-from .utils_data import retrieve_vle_for_kij
+from .utils_data import retrieve_lle_for_kij, retrieve_vle_for_kij
 
 EPS = 1e-6
+
+
+def _pred_x1_worker(
+    t: float, p: float, k_12: float, params: List[List[float]], feed_x1s: np.ndarray
+) -> float:
+    """Predict liquid-phase mole fraction of component 1 for one state point.
+
+    Args:
+        t (float): Temperature in Kelvin.
+        p (float): Pressure in kPa.
+        k_12 (float): Binary interaction parameter.
+        params (List[List[float]]): PC-SAFT parameters for the binary mixture.
+        feed_x1s (np.ndarray): Candidate feed mole fractions for component 1.
+
+    Returns:
+        out (float): Predicted mole fraction of component 1 in the denser phase.
+            Returns np.nan when no converged flash result is found.
+    """
+    for feed_x1 in feed_x1s:
+        try:
+            # Check stability.
+            if not is_stable_feos(
+                parameters=params,
+                state=[t, p * 1e3, feed_x1, 1 - feed_x1],
+                kij_matrix=[[0.0, k_12], [k_12, 0.0]],
+                epsilon_ab=None,
+                density_initialization=None,
+            ):
+                flash = mix_tp_flash_feos(
+                    parameters=params,
+                    state=[t, p * 1e3, feed_x1, 1 - feed_x1],
+                    kij_matrix=[[0.0, k_12], [k_12, 0.0]],
+                    epsilon_ab=None,
+                )
+                # Return the composition of the denser phase (usually liquid).
+                # flash.liquid identifies phase_1 and flash.vapor identifies phase_2
+                if flash.liquid.density > flash.vapor.density:
+                    return float(flash.liquid.molefracs[0])
+                return float(flash.vapor.molefracs[0])
+        except RuntimeError:
+            continue
+    return np.nan
+
+
+def _loss_fn(
+    k_12_arr: np.ndarray,
+    params: List[List[float]],
+    x1: np.ndarray,
+    temperature: np.ndarray,
+    pressure: np.ndarray,
+    feed_x1s: np.ndarray,
+) -> np.ndarray:
+    """Compute residual vector used in least-squares optimization.
+
+    Args:
+        k_12_arr (np.ndarray): Array containing a single optimization variable (k_12).
+        params (List[List[float]]): PC-SAFT parameters for the binary mixture.
+        x1 (np.ndarray): Experimental mole fractions of component 1.
+        temperature (np.ndarray): Temperatures in Kelvin.
+        pressure (np.ndarray): Pressures in kPa.
+        feed_x1s (np.ndarray): Candidate feed mole fractions for flash calculations.
+
+    Returns:
+        out (np.ndarray): Residual vector defined as log(predicted/experimental).
+            Failed flash evaluations are penalized with a large residual.
+    """
+    k_12 = k_12_arr[0]
+
+    pred_x1 = np.asarray(
+        [
+            _pred_x1_worker(T, P, k_12, params, feed_x1s)
+            for T, P in zip(temperature, pressure)
+        ]
+    )
+
+    # Calculate residuals: log(pred) - log(exp) = log(pred/exp)
+    residuals = np.log((pred_x1 + EPS) / (x1 + EPS))
+
+    # Handle NaNs (failed flash) by assigning a large penalty
+    nan_mask = np.isnan(residuals)
+    residuals[nan_mask] = 10.0
+
+    return residuals
 
 
 def _pred_bp_worker(
     t: float, x1: float, k_12: float, params: List[List[float]]
 ) -> float:
     """Predict bubble point pressure for one state point.
-
-    Must be at module level for pickle compatibility on Windows.
 
     Args:
         t (float): Temperature in Kelvin.
@@ -123,6 +204,57 @@ def optimize_binary_kij_with_vle(
                 "x1": x1s,
                 "temperature": temperatures,
                 "pressure": pressures,
+            },
+            jac="2-point",
+            method="lm",
+            ftol=1e-8,
+            xtol=1e-8,
+        )
+        return res.x[0].item()
+    except RuntimeError:
+        logger.exception("Failed kij optimization")
+        return (
+            "Experimental data found for kij optimization "
+            "but kij optimization failed, try another initial_kij"
+        )
+
+
+def optimize_binary_kij_with_lle(
+    smiles_list: List[str],
+    initial_kij: float,
+    npoints: int = 50,
+) -> Union[float, str]:
+    """
+    Optimize the kij interaction parameter for a binary mixture with LLE
+    experimental data if available.
+
+    Args:
+        smiles_list (List[str]): List of SMILES strings [SMILE_1, SMILES_2] for the components.
+        initial_kij (float): Initial guess for the kij interaction parameter.
+        npoints (int): Number of candidate feed mole fractions used in flash scans.
+    """
+
+    parameters = [predict_pcsaft_parameters(smiles) for smiles in smiles_list]
+
+    lle = retrieve_lle_for_kij(smiles_list=smiles_list)
+    if lle is None:
+        return "No experimental data found for kij optimization"
+
+    x1s = lle[:, 0]
+    pressures = lle[:, 1]
+    temperatures = lle[:, 2]
+    feed_x1s = np.linspace(1e-5, 0.99, npoints)
+    try:
+        # Optimize
+        res = least_squares(
+            fun=_loss_fn,
+            x0=[initial_kij],
+            kwargs={
+                "params": parameters,
+                "x1": x1s,
+                "temperature": temperatures,
+                "pressure": pressures,
+                "feed_x1s": feed_x1s,
             },
             jac="2-point",
             method="lm",
