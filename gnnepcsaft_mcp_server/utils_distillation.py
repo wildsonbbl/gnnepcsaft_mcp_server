@@ -5,7 +5,7 @@ calculations using PC-SAFT models.
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -57,6 +57,7 @@ class OperatingLineData:
     feed_intersection_y: float
     q_line: List[float]
     feed_intersection: List[float]
+    minimum_reflux_ratio: float
 
 
 @dataclass
@@ -96,6 +97,7 @@ def _validate_distillation_inputs(
     feed_quality: float,
     reflux_ratio: float,
     max_stages: int,
+    minimum_reflux_ratio: Optional[float] = None,
 ) -> Tuple[float, float, float, float, float, int]:
     """Validate the process parameters for the distillation calculation."""
     if not all(
@@ -113,6 +115,14 @@ def _validate_distillation_inputs(
         raise ValueError("Require 0 <= bottoms < feed < distillate <= 1")
     if reflux_ratio <= 0.0 or not np.isfinite(reflux_ratio):
         raise ValueError("Reflux ratio must be finite and positive")
+    if minimum_reflux_ratio is not None:
+        if not np.isfinite(minimum_reflux_ratio) or minimum_reflux_ratio < 0.0:
+            raise ValueError("Minimum reflux ratio must be finite and non-negative")
+        if reflux_ratio < minimum_reflux_ratio:
+            raise ValueError(
+                "Reflux ratio must be greater than or equal to"
+                f" the minimum reflux ratio ({minimum_reflux_ratio})"
+            )
     if not np.isfinite(feed_quality):
         raise ValueError("Feed quality must be finite")
     if max_stages < 1:
@@ -134,6 +144,7 @@ def _compute_operating_lines(
     bottoms_composition: float,
     feed_quality: float,
     reflux_ratio: float,
+    minimum_reflux_ratio: float,
 ) -> OperatingLineData:
     """Compute the operating and feed lines for the McCabe-Thiele construction."""
     rectifying_slope = reflux_ratio / (reflux_ratio + 1.0)
@@ -173,6 +184,7 @@ def _compute_operating_lines(
         feed_intersection_y=feed_intersection_y,
         q_line=q_line,
         feed_intersection=[feed_intersection_x, feed_intersection_y],
+        minimum_reflux_ratio=minimum_reflux_ratio,
     )
 
 
@@ -188,6 +200,54 @@ def _operating_line_value(
     if x_value >= feed_intersection_x:
         return rectifying_slope * x_value + rectifying_intercept
     return stripping_slope * x_value + stripping_intercept
+
+
+def _compute_minimum_reflux_ratio(
+    x_eq: np.ndarray,
+    y_eq: np.ndarray,
+    feed_composition: float,
+    distillate_composition: float,
+    bottoms_composition: float,
+    feed_quality: float,
+) -> float:
+    """Calculate the minimum reflux ratio from the equilibrium pinch."""
+    if np.isclose(feed_quality, 1.0):
+        pinch_x = feed_composition
+        pinch_y = float(np.interp(pinch_x, x_eq, y_eq))
+    else:
+        q_slope = feed_quality / (feed_quality - 1.0)
+        q_intercept = -feed_composition / (feed_quality - 1.0)
+        difference = y_eq - (q_slope * x_eq + q_intercept)
+        candidates = []
+        for index, value in enumerate(difference[:-1]):
+            next_value = difference[index + 1]
+            if np.isclose(value, 0.0):
+                candidates.append((x_eq[index], y_eq[index]))
+            elif value * next_value < 0.0:
+                fraction = -value / (next_value - value)
+                candidates.append(
+                    (
+                        x_eq[index] + fraction * (x_eq[index + 1] - x_eq[index]),
+                        y_eq[index] + fraction * (y_eq[index + 1] - y_eq[index]),
+                    )
+                )
+        if np.isclose(difference[-1], 0.0):
+            candidates.append((x_eq[-1], y_eq[-1]))
+        candidates = [
+            candidate
+            for candidate in candidates
+            if bottoms_composition < candidate[0] < distillate_composition
+        ]
+        if not candidates:
+            raise ValueError("q-line does not intersect the equilibrium curve")
+        pinch_x, pinch_y = min(
+            candidates, key=lambda candidate: abs(candidate[0] - feed_composition)
+        )
+
+    denominator = pinch_y - pinch_x
+    if denominator <= 0.0 or pinch_y >= distillate_composition:
+        raise ValueError("Minimum reflux condition is not physically feasible")
+    return float((distillate_composition - pinch_y) / denominator)
 
 
 def _simulate_stages(
@@ -280,6 +340,7 @@ def mccabe_thiele(
         - "stripping_line": [slope, intercept] of the stripping operating line
         - "q_line": [slope, intercept] of the feed line, or [None, x_F] for q = 1
         - "feed_intersection": [x_int, y_int] intersection of the operating lines
+        - "minimum_reflux_ratio": minimum external reflux ratio, R_min
 
     Notes
     -----
@@ -302,7 +363,17 @@ def mccabe_thiele(
         params.reflux_ratio,
         params.max_stages,
     )
-    line_data = _compute_operating_lines(x_f, x_d, x_b, q, reflux)
+    minimum_reflux_ratio = _compute_minimum_reflux_ratio(x_eq, y_eq, x_f, x_d, x_b, q)
+    _validate_distillation_inputs(
+        x_f,
+        x_d,
+        x_b,
+        q,
+        reflux,
+        max_stages,
+        minimum_reflux_ratio,
+    )
+    line_data = _compute_operating_lines(x_f, x_d, x_b, q, reflux, minimum_reflux_ratio)
     stage_data = _simulate_stages(
         x_eq,
         y_eq,
@@ -331,6 +402,7 @@ def mccabe_thiele(
         ],
         "q_line": line_data.q_line,
         "feed_intersection": line_data.feed_intersection,
+        "minimum_reflux_ratio": line_data.minimum_reflux_ratio,
     }
 
 
@@ -377,6 +449,7 @@ def distillation_column(
         - "stripping_line": [slope, intercept] of the stripping operating line
         - "q_line": [slope, intercept] of the feed line, or [None, x_F] for q = 1
         - "feed_intersection": [x_int, y_int] intersection of the operating lines
+        - "minimum_reflux_ratio": minimum external reflux ratio, R_min
 
     Examples
     --------
