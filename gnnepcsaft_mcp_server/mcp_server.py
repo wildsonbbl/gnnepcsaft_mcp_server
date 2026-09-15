@@ -16,6 +16,7 @@ from .utils import (
     mixture_density,
     mixture_vapor_pressure,
 )
+from .utils_kij import optimize_binary_kij_with_lle, optimize_binary_kij_with_vle
 
 mcp = FastMCP("gnnpcsaft")
 fn_list: List[Callable[..., Any]] = [
@@ -26,6 +27,8 @@ fn_list: List[Callable[..., Any]] = [
     batch_pure_vapor_pressure,
     mixture_density,
     mixture_vapor_pressure,
+    optimize_binary_kij_with_lle,
+    optimize_binary_kij_with_vle,
     batch_inchi_to_smiles,
     batch_smiles_to_inchi,
     batch_molecular_weights,
