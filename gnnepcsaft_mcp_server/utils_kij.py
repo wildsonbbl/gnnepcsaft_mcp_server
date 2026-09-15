@@ -34,7 +34,7 @@ def _pred_x1_worker(
     Returns:
         out (Tuple[float, float]): Predicted mole fractions of component 1 in
             both equilibrium phases. The phase order is not significant. Returns
-            ``(np.nan, np.nan)`` when no converged flash result is found.
+            `(np.nan, np.nan)` when no converged flash result is found.
     """
     for feed_x1 in feed_x1s:
         try:
@@ -184,7 +184,7 @@ def optimize_binary_kij_with_vle(
     """
     Optimize the kij interaction parameter for a binary mixture with VLE
     experimental data, if available. Experimental Data is from the
-    ``ThermoML Archive`` (https://doi.org/10.18434/mds2-2422).
+    `ThermoML Archive` (https://doi.org/10.18434/mds2-2422).
 
     Args:
         smiles_list (List[str]): List of SMILES strings [SMILE_1, SMILES_2] for the components.
@@ -234,7 +234,7 @@ def optimize_binary_kij_with_lle(
     """
     Optimize the kij interaction parameter for a binary mixture with LLE
     experimental data, if available. Experimental Data is from the
-    ``ThermoML Archive`` (https://doi.org/10.18434/mds2-2422).
+    `ThermoML Archive` (https://doi.org/10.18434/mds2-2422).
 
     Args:
         smiles_list (List[str]): List of SMILES strings [SMILE_1, SMILES_2] for the components.

@@ -421,9 +421,9 @@ def distillation_column(
     Parameters
     ----------
     equilibrium_x : List[float]
-        Liquid compositions x of the VLE curve, typically from ``mix_vle(...)["x0"]``.
+        Liquid compositions x of the VLE curve, typically from `mix_vle(...)["x0"]`.
     equilibrium_y : List[float]
-        Vapor compositions y of the VLE curve, typically from ``mix_vle(...)["y0"]``.
+        Vapor compositions y of the VLE curve, typically from `mix_vle(...)["y0"]`.
     feed_composition : float
         Feed light-key mole fraction x_F.
     distillate_composition : float
