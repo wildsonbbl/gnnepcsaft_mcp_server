@@ -4,7 +4,7 @@ This module predicts bubble-point pressures and optimizes the binary
 interaction parameter against available vapor–liquid equilibrium data.
 """
 
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import numpy as np
 from gnnepcsaft.pcsaft.pcsaft_feos import is_stable_feos, mix_tp_flash_feos, mix_vp_feos
@@ -21,7 +21,7 @@ EPS = 1e-6
 
 def _pred_x1_worker(
     t: float, p: float, k_12: float, params: List[List[float]], feed_x1s: np.ndarray
-) -> float:
+) -> Tuple[float, float]:
     """Predict liquid-phase mole fraction of component 1 for one state point.
 
     Args:
@@ -32,8 +32,9 @@ def _pred_x1_worker(
         feed_x1s (np.ndarray): Candidate feed mole fractions for component 1.
 
     Returns:
-        out (float): Predicted mole fraction of component 1 in the denser phase.
-            Returns np.nan when no converged flash result is found.
+        out (Tuple[float, float]): Predicted mole fractions of component 1 in
+            both equilibrium phases. The phase order is not significant. Returns
+            ``(np.nan, np.nan)`` when no converged flash result is found.
     """
     for feed_x1 in feed_x1s:
         try:
@@ -51,14 +52,16 @@ def _pred_x1_worker(
                     kij_matrix=[[0.0, k_12], [k_12, 0.0]],
                     epsilon_ab=None,
                 )
-                # Return the composition of the denser phase (usually liquid).
+                # LLE data may refer to either liquid phase. Keep both phase
+                # compositions and let the loss function match them to data.
                 # flash.liquid identifies phase_1 and flash.vapor identifies phase_2
-                if flash.liquid.density > flash.vapor.density:
-                    return float(flash.liquid.molefracs[0])
-                return float(flash.vapor.molefracs[0])
+                return (
+                    float(flash.liquid.molefracs[0]),
+                    float(flash.vapor.molefracs[0]),
+                )
         except RuntimeError:
             continue
-    return np.nan
+    return np.nan, np.nan
 
 
 def _loss_fn(
@@ -92,8 +95,11 @@ def _loss_fn(
         ]
     )
 
-    # Calculate residuals: log(pred) - log(exp) = log(pred/exp)
-    residuals = np.log((pred_x1 + EPS) / (x1 + EPS))
+    # The experimental endpoint can belong to either liquid phase. Match it to
+    # whichever predicted phase gives the smaller log-composition residual.
+    log_residuals = np.log((pred_x1 + EPS) / (x1[:, np.newaxis] + EPS))
+    selection_metric = np.where(np.isnan(log_residuals), np.inf, np.abs(log_residuals))
+    residuals = log_residuals[np.arange(x1.size), np.argmin(selection_metric, axis=1)]
 
     # Handle NaNs (failed flash) by assigning a large penalty
     nan_mask = np.isnan(residuals)
