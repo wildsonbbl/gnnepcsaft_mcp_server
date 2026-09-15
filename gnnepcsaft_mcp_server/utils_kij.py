@@ -183,7 +183,8 @@ def optimize_binary_kij_with_vle(
 ) -> Union[float, str]:
     """
     Optimize the kij interaction parameter for a binary mixture with VLE
-    experimental data if available.
+    experimental data, if available. Experimental Data is from the
+    ``ThermoML Archive`` (https://doi.org/10.18434/mds2-2422).
 
     Args:
         smiles_list (List[str]): List of SMILES strings [SMILE_1, SMILES_2] for the components.
@@ -232,7 +233,8 @@ def optimize_binary_kij_with_lle(
 ) -> Union[float, str]:
     """
     Optimize the kij interaction parameter for a binary mixture with LLE
-    experimental data if available.
+    experimental data, if available. Experimental Data is from the
+    ``ThermoML Archive`` (https://doi.org/10.18434/mds2-2422).
 
     Args:
         smiles_list (List[str]): List of SMILES strings [SMILE_1, SMILES_2] for the components.
