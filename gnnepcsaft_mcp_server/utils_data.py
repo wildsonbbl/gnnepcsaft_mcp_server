@@ -464,8 +464,8 @@ def retrieve_available_data_pure(
             if isinstance(data_pure["rho_range"], List)
             else "0 data points"
         ),
-        "vapor_pressure_data": f"{data_pure["vp_range"]} data points",
-        "surface_tension_data": f"{data_pure["st_range"]} data points",
+        "vapor_pressure_data": f"{data_pure['vp_range']} data points",
+        "surface_tension_data": f"{data_pure['st_range']} data points",
     }
 
 
