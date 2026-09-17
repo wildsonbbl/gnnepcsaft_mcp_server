@@ -2,7 +2,7 @@
 
 from typing import Any, Callable, List
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from .utils import (
     batch_critical_points,
@@ -18,7 +18,7 @@ from .utils import (
 )
 from .utils_kij import optimize_binary_kij_with_lle, optimize_binary_kij_with_vle
 
-mcp = FastMCP("gnnpcsaft")
+mcp = MCPServer("gnnpcsaft")
 fn_list: List[Callable[..., Any]] = [
     batch_predict_pcsaft_parameters,
     batch_critical_points,
