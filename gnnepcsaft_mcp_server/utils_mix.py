@@ -240,7 +240,6 @@ def _build_binary_vle_pxy_series(
     series = BinaryVleSeries(xs=[], bps=[], dps=[])
     _append_binary_pure_point(temperature, tcs, vps, series)
 
-    previous_bp = 0.0
     for x0 in x0s:
         point = _binary_vle_pxy_point(context, x0)
         if point is None:
@@ -248,9 +247,6 @@ def _build_binary_vle_pxy_series(
         if point == "break":
             break
         bp, dp, warn_above_min = point
-        if previous_bp > max(bp, dp):
-            continue
-        previous_bp = max(bp, dp)
         if warn_above_min:
             logger.warning(
                 "mix_vle_pxy: point above one component Pc at x0=%.4f: bp=%.2f, dp=%.2f",
@@ -429,7 +425,6 @@ def _build_ternary_vle_series(
 ) -> TernaryVleSeries:
     series = TernaryVleSeries(x1_values=[], bubble_pressures=[], dew_pressures=[])
 
-    previous_bp = 0.0
     for x1 in x1_grid:
         x2, x3 = _ternary_solvent_split(x1, solvent_ratio)
         if x2 <= 0.0 or x3 <= 0.0:
@@ -440,9 +435,6 @@ def _build_ternary_vle_series(
             continue
 
         bubble_p, dew_p = point
-        if previous_bp > max(bubble_p, dew_p):
-            continue
-        previous_bp = max(bubble_p, dew_p)
         result = _append_ternary_pressures(x1, bubble_p, dew_p, context, series)
         if result == "break":
             break
@@ -473,7 +465,7 @@ def mix_den(params: MixDenParams) -> Tuple[List[float], List[float]]:
     densities = [
         mix_den_feos(
             parameters=parameters_list,
-            state=[T, params.pressure] + params.mole_fractions,
+            state=[T, params.pressure, *params.mole_fractions],
             kij_matrix=params.kij_matrix,
         )
         for T in temperatures
@@ -493,17 +485,13 @@ def mix_vp(params: MixVpParams) -> Tuple[List[float], List[float], List[float]]:
     bubble_points = []
     dew_point = []
     valid_temperatures = []
-    previous_bp = 0.0
     for temp in temperatures:
         try:
             bp, dp = mix_vp_feos(
                 parameters=parameters_list,
-                state=[temp, 0] + params.mole_fractions,
+                state=[temp, 0.0, *params.mole_fractions],
                 kij_matrix=params.kij_matrix,
             )
-            if previous_bp > max(bp, dp):
-                continue
-            previous_bp = max(bp, dp)
             bubble_points.append(max(bp, dp))
             dew_point.append(min(bp, dp))
             valid_temperatures.append(temp)
