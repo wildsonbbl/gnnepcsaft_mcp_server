@@ -21,6 +21,8 @@ sys.modules["gnnepcsaft.data.ogb_utils"] = MagicMock()
 sys.modules["gnnepcsaft.data.rdkit_util"] = MagicMock()
 sys.modules["gnnepcsaft.pcsaft"] = MagicMock()
 sys.modules["gnnepcsaft.pcsaft.pcsaft_feos"] = MagicMock()
+sys.modules["gnnepcsaft.pcsaft.feos"] = MagicMock()
+sys.modules["gnnepcsaft.pcsaft.feos.equilibria"] = MagicMock()
 
 # -- IMPORT MODULES TO TEST --
 from gnnepcsaft_mcp_server import utils_mix, utils_pure
@@ -425,11 +427,13 @@ class TestUtilsMix(unittest.TestCase):
         self.assertEqual(res, expected_output)
 
     @patch("gnnepcsaft_mcp_server.utils_mix.predict_pcsaft_parameters")
-    @patch("gnnepcsaft_mcp_server.utils_mix.mix_vp_feos")
-    def test_mix_vp(self, mock_calc, mock_predict):
+    @patch("gnnepcsaft_mcp_server.utils_mix.mix_dp_feos")
+    @patch("gnnepcsaft_mcp_server.utils_mix.mix_bp_feos")
+    def test_mix_vp(self, mock_mix_bp, mock_mix_dp, mock_predict):
         """Test Mixture Vapor Pressure Logic"""
         mock_predict.side_effect = ["p1", "p2"]
-        mock_calc.return_value = (101325.0, 90000.0)  # bubble and dew pressures
+        mock_mix_bp.return_value = 101325.0
+        mock_mix_dp.return_value = 90000.0
 
         params = utils_mix.MixVpParams(
             smiles_list=["A", "B"],
@@ -448,13 +452,17 @@ class TestUtilsMix(unittest.TestCase):
     @patch("gnnepcsaft_mcp_server.utils_mix.predict_pcsaft_parameters")
     @patch("gnnepcsaft_mcp_server.utils_mix.critical_points_feos")
     @patch("gnnepcsaft_mcp_server.utils_mix.pure_vp_feos")
-    @patch("gnnepcsaft_mcp_server.utils_mix.mix_vp_feos")
-    def test_mix_vle_pxy(self, mock_mix_vp, mock_pure_vp, mock_critical, mock_predict):
+    @patch("gnnepcsaft_mcp_server.utils_mix.mix_dp_feos")
+    @patch("gnnepcsaft_mcp_server.utils_mix.mix_bp_feos")
+    def test_mix_vle_pxy(
+        self, mock_mix_bp, mock_mix_dp, mock_pure_vp, mock_critical, mock_predict
+    ):
         """Test Binary VLE P-x-y Diagram Logic"""
         mock_predict.side_effect = [[1, 2, 3], [1, 2, 3]]
         mock_critical.return_value = (400.0, 5e6, "unused")
         mock_pure_vp.return_value = 50000.0
-        mock_mix_vp.return_value = (101325.0, 90000.0)
+        mock_mix_bp.return_value = 101325.0
+        mock_mix_dp.return_value = 90000.0
 
         res = utils_mix.mix_vle_pxy(
             ["A", "B"], [[0, 0], [0, 0]], temperature=350.0, npoints=5
@@ -521,15 +529,17 @@ class TestUtilsMix(unittest.TestCase):
     @patch("gnnepcsaft_mcp_server.utils_mix.predict_pcsaft_parameters")
     @patch("gnnepcsaft_mcp_server.utils_mix.critical_points_feos")
     @patch("gnnepcsaft_mcp_server.utils_mix.pure_vp_feos")
-    @patch("gnnepcsaft_mcp_server.utils_mix.mix_vp_feos")
+    @patch("gnnepcsaft_mcp_server.utils_mix.mix_dp_feos")
+    @patch("gnnepcsaft_mcp_server.utils_mix.mix_bp_feos")
     def test_mix_ternary_vle_tx_fixed(
-        self, mock_mix_vp, mock_pure_vp, mock_critical, mock_predict
+        self, mock_mix_bp, mock_mix_dp, mock_pure_vp, mock_critical, mock_predict
     ):
         """Test Ternary VLE with fixed Temperature and Solvent Ratio"""
         mock_predict.side_effect = [[1, 2, 3], [1, 2, 3], [1, 2, 3]]
         mock_critical.return_value = (400.0, 5e6, "unused")
         mock_pure_vp.return_value = 50000.0
-        mock_mix_vp.return_value = (101325.0, 90000.0)
+        mock_mix_bp.return_value = 101325.0
+        mock_mix_dp.return_value = 90000.0
 
         params = utils_mix.TernaryVleTxParams(
             smiles_list=["A", "B", "C"],

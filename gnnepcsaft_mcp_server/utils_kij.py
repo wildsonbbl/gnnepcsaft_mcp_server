@@ -7,7 +7,11 @@ interaction parameter against available vapor–liquid equilibrium data.
 from typing import List, Tuple, Union
 
 import numpy as np
-from gnnepcsaft.pcsaft.pcsaft_feos import is_stable_feos, mix_tp_flash_feos, mix_vp_feos
+from gnnepcsaft.pcsaft.feos.equilibria import mix_bp_feos
+from gnnepcsaft.pcsaft.pcsaft_feos import (
+    is_stable_feos,
+    mix_tp_flash_feos,
+)
 from numpy import float64
 from numpy.typing import NDArray
 from scipy.optimize import least_squares
@@ -124,13 +128,13 @@ def _pred_bp_worker(
             Returns np.nan when bubble point calculation fails.
     """
     try:
-        bp_pa, dp_pa = mix_vp_feos(
+        bp_pa = mix_bp_feos(
             parameters=params,
             state=[t, 0.0, x1, 1 - x1],
             kij_matrix=[[0.0, k_12], [k_12, 0.0]],
             epsilon_ab=None,
         )
-        return float(max(bp_pa, dp_pa) / 1e3)  # Convert Pa to kPa
+        return float(bp_pa / 1e3)  # Convert Pa to kPa
     except RuntimeError:
         return np.nan
     except BaseException as exc:  # pylint: disable=W0718

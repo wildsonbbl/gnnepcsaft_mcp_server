@@ -6,9 +6,10 @@ and critical-point calculations using PC-SAFT models.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
+from gnnepcsaft.pcsaft.feos.equilibria import mix_bp_feos, mix_dp_feos
 from gnnepcsaft.pcsaft.pcsaft_feos import (
     critical_points_feos,
     mix_den_feos,
@@ -16,7 +17,6 @@ from gnnepcsaft.pcsaft.pcsaft_feos import (
     mix_lle_feos,
     mix_vle_diagram_feos,
     mix_vlle_diagram_feos,
-    mix_vp_feos,
     pure_vp_feos,
 )
 
@@ -192,44 +192,6 @@ def _append_binary_pure_point(
         series.dps.append(vps[1])
 
 
-def _binary_vle_pxy_point(
-    context: BinaryVlePxyContext,
-    x0: float,
-):
-    try:
-        bp, dp = mix_vp_feos(
-            parameters=context.parameters_list,
-            state=[context.temperature, np.nan, x0, 1 - x0],
-            kij_matrix=context.kij_matrix,
-        )
-    except RuntimeError as exc:
-        logger.debug("mix_vle_pxy: Runtime Error at x0=%.4f: %s", x0, exc)
-        return None
-    except BaseException as exc:  # pylint: disable=W0718
-        exception_type = type(exc).__name__
-        if exception_type == "PanicException":
-            logger.warning("mix_vle_pxy: PanicException at x0=%.4f: %s", x0, exc)
-            return None
-        logger.exception(
-            "mix_vle_pxy: unexpected %s at x0=%.4f",
-            exception_type,
-            x0,
-        )
-        raise
-
-    if bp > context.max_pc or dp > context.max_pc:
-        logger.warning(
-            "mix_vle_pxy: breaking from point above both Pc at x0=%.4f: bp=%.2f, dp=%.2f",
-            x0,
-            bp,
-            dp,
-        )
-        return "break"
-
-    warn_above_min = bp > context.min_pc or dp > context.min_pc
-    return bp, dp, warn_above_min
-
-
 def _build_binary_vle_pxy_series(
     x0s: List[float],
     temperature: float,
@@ -241,23 +203,22 @@ def _build_binary_vle_pxy_series(
     _append_binary_pure_point(temperature, tcs, vps, series)
 
     for x0 in x0s:
-        point = _binary_vle_pxy_point(context, x0)
-        if point is None:
-            continue
-        if point == "break":
-            break
-        bp, dp, warn_above_min = point
-        if warn_above_min:
-            logger.warning(
-                "mix_vle_pxy: point above one component Pc at x0=%.4f: bp=%.2f, dp=%.2f",
-                x0,
-                bp,
-                dp,
-            )
-        series.bps.append(max(bp, dp))
-        series.dps.append(min(bp, dp))
+        state = [context.temperature, np.nan, x0, 1 - x0]
+        bp = _get_bp_dp_pressure(
+            parameters_list=context.parameters_list,
+            kij_matrix=context.kij_matrix,
+            function_call=mix_bp_feos,
+            state=state,
+        )
+        dp = _get_bp_dp_pressure(
+            parameters_list=context.parameters_list,
+            kij_matrix=context.kij_matrix,
+            function_call=mix_dp_feos,
+            state=state,
+        )
+        series.bps.append(bp)
+        series.dps.append(dp)
         series.xs.append(x0)
-
     return series
 
 
@@ -344,78 +305,40 @@ def _ternary_solvent_split(x1: float, solvent_ratio: float) -> Tuple[float, floa
     return x2, x3
 
 
-def _ternary_vle_tx_point(
-    context: TernaryVleContext,
-    x1: float,
-    x2: float,
-    x3: float,
-) -> Optional[Tuple[float, float]]:
+def _get_bp_dp_pressure(
+    parameters_list: List[List[float]],
+    kij_matrix: List[List[float]],
+    function_call: Callable,
+    state: List[float],
+) -> float:
     try:
-        return mix_vp_feos(
-            parameters=context.parameters_list,
-            state=[context.temperature, 0.0, float(x1), float(x2), float(x3)],
-            kij_matrix=context.kij_matrix,
+        return function_call(
+            parameters=parameters_list,
+            state=state,
+            kij_matrix=kij_matrix,
         )
     except RuntimeError as exc:
         logger.debug(
-            "mix_ternary_vle_tx_fixed: Runtime Error at x1=%.4f, x2=%.4f, x3=%.4f: %s",
-            x1,
-            x2,
-            x3,
+            "_get_bp_dp_pressure: Runtime Error at state=%r: %s",
+            state,
             exc,
         )
-        return None
+        return float("nan")
     except BaseException as exc:  # pylint: disable=W0718
         exception_type = type(exc).__name__
         if exception_type == "PanicException":
             logger.warning(
-                "mix_ternary_vle_tx_fixed: PanicException at x1=%.4f, x2=%.4f, x3=%.4f: %s",
-                x1,
-                x2,
-                x3,
+                "_get_bp_dp_pressure: PanicException at state=%r: %s",
+                state,
                 exc,
             )
-            return None
+            return float("nan")
         logger.exception(
-            "mix_ternary_vle_tx_fixed: unexpected %s at x1=%.4f, x2=%.4f, x3=%.4f",
+            "_get_bp_dp_pressure: unexpected %s at state=%r",
             exception_type,
-            x1,
-            x2,
-            x3,
+            state,
         )
         raise
-
-
-def _append_ternary_pressures(
-    x1: float,
-    bubble_p: float,
-    dew_p: float,
-    context: TernaryVleContext,
-    series: TernaryVleSeries,
-):
-    if bubble_p > context.max_pc or dew_p > context.max_pc:
-        logger.warning(
-            "mix_ternary_vle_tx_fixed: breaking from "
-            "point above all Pc at x1=%.4f: bp=%.2f, dp=%.2f",
-            x1,
-            bubble_p,
-            dew_p,
-        )
-        return "break"
-    if bubble_p > context.min_pc or dew_p > context.min_pc:
-        logger.warning(
-            "mix_ternary_vle_tx_fixed: point above at least "
-            "one Pc at x1=%.4f: bp=%.2f, dp=%.2f",
-            x1,
-            bubble_p,
-            dew_p,
-        )
-
-    if np.isfinite(bubble_p) and np.isfinite(dew_p) and bubble_p > 0.0 and dew_p > 0.0:
-        series.x1_values.append(float(x1))
-        series.bubble_pressures.append(float(max(bubble_p, dew_p)))
-        series.dew_pressures.append(float(min(bubble_p, dew_p)))
-    return None
 
 
 def _build_ternary_vle_series(
@@ -429,16 +352,22 @@ def _build_ternary_vle_series(
         x2, x3 = _ternary_solvent_split(x1, solvent_ratio)
         if x2 <= 0.0 or x3 <= 0.0:
             continue
-
-        point = _ternary_vle_tx_point(context, x1, x2, x3)
-        if point is None:
-            continue
-
-        bubble_p, dew_p = point
-        result = _append_ternary_pressures(x1, bubble_p, dew_p, context, series)
-        if result == "break":
-            break
-
+        state = [context.temperature, np.nan, float(x1), float(x2), float(x3)]
+        bubble_p = _get_bp_dp_pressure(
+            parameters_list=context.parameters_list,
+            kij_matrix=context.kij_matrix,
+            function_call=mix_bp_feos,
+            state=state,
+        )
+        dew_p = _get_bp_dp_pressure(
+            parameters_list=context.parameters_list,
+            kij_matrix=context.kij_matrix,
+            function_call=mix_dp_feos,
+            state=state,
+        )
+        series.x1_values.append(float(x1))
+        series.bubble_pressures.append(float(bubble_p))
+        series.dew_pressures.append(float(dew_p))
     return series
 
 
@@ -473,44 +402,35 @@ def mix_den(params: MixDenParams) -> Tuple[List[float], List[float]]:
     return temperatures, densities
 
 
-def mix_vp(params: MixVpParams) -> Tuple[List[float], List[float], List[float]]:
+def mix_vp(context: MixVpParams) -> Tuple[List[float], List[float], List[float]]:
     """Calculate mixture vapor pressure using PC-SAFT EOS."""
     parameters_list = [
-        predict_pcsaft_parameters(smiles) for smiles in params.smiles_list
+        predict_pcsaft_parameters(smiles) for smiles in context.smiles_list
     ]
     temperatures = np.linspace(
-        params.min_temp, params.max_temp, num=params.npoints
+        context.min_temp, context.max_temp, num=context.npoints
     ).tolist()
 
     bubble_points = []
     dew_point = []
     valid_temperatures = []
     for temp in temperatures:
-        try:
-            bp, dp = mix_vp_feos(
-                parameters=parameters_list,
-                state=[temp, 0.0, *params.mole_fractions],
-                kij_matrix=params.kij_matrix,
-            )
-            bubble_points.append(max(bp, dp))
-            dew_point.append(min(bp, dp))
-            valid_temperatures.append(temp)
-        except RuntimeError as exc:
-            logger.debug("mix_vp: Runtime Error at temperature=%.4f: %s", temp, exc)
-        except BaseException as exc:  # pylint: disable=W0718
-            exception_type = type(exc).__name__
-            if exception_type == "PanicException":
-                logger.warning(
-                    "mix_vp: PanicException at temperature=%.4f: %s", temp, exc
-                )
-            else:
-                logger.exception(
-                    "mix_vp: unexpected %s at temperature=%.4f",
-                    exception_type,
-                    temp,
-                )
-                raise
-
+        state = [temp, np.nan, *context.mole_fractions]
+        bp = _get_bp_dp_pressure(
+            parameters_list=parameters_list,
+            kij_matrix=context.kij_matrix,
+            function_call=mix_bp_feos,
+            state=state,
+        )
+        dp = _get_bp_dp_pressure(
+            parameters_list=parameters_list,
+            kij_matrix=context.kij_matrix,
+            function_call=mix_dp_feos,
+            state=state,
+        )
+        bubble_points.append(bp)
+        dew_point.append(dp)
+        valid_temperatures.append(temp)
     return valid_temperatures, bubble_points, dew_point
 
 
